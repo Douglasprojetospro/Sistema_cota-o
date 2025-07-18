@@ -71,7 +71,7 @@ def cotar():
 
         # Prepare API payload with fixed ID 9
         payload = {
-            "id_contrato_transportadora_segmento": "9",  # ID fixo conforme solicitado
+            "id_contrato_transportadora_segmento": "1",  # ID fixo conforme solicitado
             "cnpj_origem": limpar_cnpj(dados["cnpj_origem"]),
             "cep_origem": dados["cep_origem"],
             "estado_origem": "SC",
