@@ -2,42 +2,47 @@ from flask import Flask, render_template, request, jsonify
 import re
 import requests
 import time
+import os
 import logging
 
+# Configure application
 app = Flask(__name__, static_folder='static')
 
-# Configurações
-TOKEN_API = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6IjMzMSIsImNoYXZlIjoiOTI1MjRjNjI2Nzk3OTMyZWVkNTAxNjZlNjA2OGIxMTUiLCJ0aW1lc3RhbXAiOjE3NDQxOTc4MDZ9.kHED9W69zqHOH4NJ0rQh_LEmMhhWEuLlDCsVG_xe6kQ"
+# API Configuration
+TOKEN_API = os.environ.get('TOKEN_API', "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6IjMzMSIsImNoYXZlIjoiOTI1MjRjNjI2Nzk3OTMyZWVkNTAxNjZlNjA2OGIxMTUiLCJ0aW1lc3RhbXAiOjE3NDQxOTc4MDZ9.kHED9W69zqHOH4NJ0rQh_LEmMhhWEuLlDCsVG_xe6kQ")
 URL_API = "http://sistema.prolicitante.com.br/appapi/logistica/cotar_frete_externo"
 
-# Configurar logging
-logging.basicConfig(level=logging.DEBUG)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Variável global para controle de rate limiting
+# Rate limiting control
 controle_requisicoes = [0, time.time()]
 
 def limpar_cnpj(cnpj):
+    """Remove all non-digit characters from CNPJ/CPF"""
     return re.sub(r'\D', '', str(cnpj))
 
 @app.route("/")
 def index():
+    """Main page route"""
     return render_template("index.html")
 
 @app.route("/cotar", methods=["POST"])
 def cotar():
+    """Freight calculation endpoint"""
     global controle_requisicoes
     
     try:
-        # Obter dados do formulário
+        # Get form data
         if request.content_type == 'application/json':
             dados = request.get_json()
         else:
             dados = request.form.to_dict()
 
-        logger.debug(f"Dados recebidos: {dados}")
+        logger.info("Dados recebidos para cotação")
 
-        # Validar campos obrigatórios
+        # Validate required fields
         campos_obrigatorios = ['cnpj_origem', 'cep_origem', 'cnpj_destino', 'cep_destino']
         for campo in campos_obrigatorios:
             if not dados.get(campo):
@@ -47,7 +52,7 @@ def cotar():
                     "mensagem": f"O campo {campo} é obrigatório"
                 }), 400
 
-        # Controle de rate limiting
+        # Rate limiting control
         if controle_requisicoes[0] >= 15:
             tempo_passado = time.time() - controle_requisicoes[1]
             if tempo_passado < 10:
@@ -56,13 +61,13 @@ def cotar():
             controle_requisicoes[0] = 0
             controle_requisicoes[1] = time.time()
 
-        # Processar múltiplos pacotes
+        # Process multiple packages
         produtos = []
         i = 0
         while True:
             quantidade = dados.get(f"quantidade_{i}")
             
-            # Se for o primeiro pacote e não tiver quantidade, erro
+            # First package is mandatory
             if i == 0 and not quantidade:
                 logger.error("Nenhum pacote informado")
                 return jsonify({
@@ -70,7 +75,7 @@ def cotar():
                     "mensagem": "É necessário informar pelo menos um pacote"
                 }), 400
                 
-            # Se não tiver mais pacotes, sai do loop
+            # Exit loop if no more packages
             if not quantidade:
                 break
                 
@@ -85,6 +90,7 @@ def cotar():
             })
             i += 1
 
+        # Prepare API payload
         payload = {
             "id_contrato_transportadora_segmento": "9",
             "cnpj_origem": limpar_cnpj(dados.get("cnpj_origem")),
@@ -103,9 +109,9 @@ def cotar():
             "Content-Type": "application/json"
         }
 
-        logger.debug(f"Payload enviado: {payload}")
+        logger.info(f"Enviando payload para API: {payload}")
 
-        # Fazer requisição para a API
+        # Make API request
         response = requests.post(
             URL_API,
             headers=headers,
@@ -115,18 +121,18 @@ def cotar():
         
         response.raise_for_status()
         data = response.json()
-        logger.debug(f"Resposta da API: {data}")
+        logger.info(f"Resposta da API recebida: {data}")
 
-        # Processar resposta
+        # Process API response
         if isinstance(data, dict):
-            if data.get("erro") in [False, "False"] and "resultado" in data:
+            if str(data.get("erro")).lower() in ['false', '0', ''] and "resultado" in data:
                 if data["resultado"]:
+                    # Sort options by price
                     opcoes_ordenadas = sorted(
                         data["resultado"],
                         key=lambda x: float(x.get("total", 0))
-                    )
                     
-                    # Formatando os resultados
+                    # Format results
                     for opcao in opcoes_ordenadas:
                         opcao['total'] = float(opcao.get('total', 0))
                         opcao['prazo'] = opcao.get('prazo', 'N/A')
@@ -161,4 +167,5 @@ def cotar():
         }), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
