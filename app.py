@@ -6,7 +6,7 @@ import os
 import logging
 
 # Configure application
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder='static', template_folder='templates')
 
 # API Configuration
 TOKEN_API = os.environ.get('TOKEN_API', "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6IjMzMSIsImNoYXZlIjoiOTI1MjRjNjI2Nzk3OTMyZWVkNTAxNjZlNjA2OGIxMTUiLCJ0aW1lc3RhbXAiOjE3NDQxOTc4MDZ9.kHED9W69zqHOH4NJ0rQh_LEmMhhWEuLlDCsVG_xe6kQ")
@@ -46,15 +46,7 @@ def cotar():
                 logger.error(error_msg)
                 return jsonify({"status": "erro", "mensagem": error_msg}), 400
 
-        # Rate limiting
-        if controle_requisicoes[0] >= 15:
-            tempo_passado = time.time() - controle_requisicoes[1]
-            if tempo_passado < 10:
-                time.sleep(10 - tempo_passado)
-            controle_requisicoes[0] = 0
-            controle_requisicoes[1] = time.time()
-
-        # Process packages
+        # Process multiple packages
         produtos = []
         i = 0
         while True:
@@ -77,67 +69,71 @@ def cotar():
             })
             i += 1
 
-        # Prepare API request
+        # Prepare API payload with fixed ID 9
         payload = {
-            "id_contrato_transportadora_segmento": "9",
+            "id_contrato_transportadora_segmento": "9",  # ID fixo conforme solicitado
             "cnpj_origem": limpar_cnpj(dados["cnpj_origem"]),
             "cep_origem": dados["cep_origem"],
             "estado_origem": "SC",
             "cidade_origem": "Lages",
             "cnpj_destino": limpar_cnpj(dados["cnpj_destino"]),
             "cep_destino": dados["cep_destino"],
+            "estado_destino": "",
+            "cidade_destino": "",
             "produtos": produtos
         }
 
-        headers = {"Authorization": TOKEN_API, "Content-Type": "application/json"}
-        logger.info(f"Enviando para API: {payload}")
+        headers = {
+            "Authorization": TOKEN_API,
+            "Content-Type": "application/json"
+        }
 
-        # Make API call
+        # Make API request
         response = requests.post(URL_API, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
         data = response.json()
-        logger.info(f"Resposta da API: {data}")
+        logger.info(f"Resposta completa da API: {data}")
 
-        # Process response
-        if data.get("erro") in [False, "False", 0, "0"] and data.get("resultado"):
-            resultados = sorted(
-                data["resultado"],
-                key=lambda x: float(x.get("total", 0))
-            )
+        # Process all results without filtering
+        if isinstance(data, dict) and "resultado" in data:
+            todas_opcoes = data["resultado"]
             
-            return jsonify({
-                "status": "sucesso",
-                "opcoes": [{
-                    "transportadora": r.get("transportadora"),
-                    "total": float(r.get("total", 0)),
-                    "prazo": r.get("prazo", "N/A"),
-                    "servico": r.get("servico", "Padrão"),
-                    "imagem": r.get("imagem")
-                } for r in resultados],
-                "dados_entrega": {
-                    "valor_total": sum(float(p["valor"]) for p in produtos),
-                    "peso_total": sum(float(p["peso"]) for p in produtos),
-                    "qtd_total": sum(int(p["quantidade"]) for p in produtos)
-                }
-            })
+            if todas_opcoes:
+                return jsonify({
+                    "status": "sucesso",
+                    "opcoes": [{
+                        "transportadora": opcao.get("transportadora", "Transportadora não especificada"),
+                        "total": float(opcao.get("total", 0)),
+                        "prazo": opcao.get("prazo", "N/A"),
+                        "servico": opcao.get("servico", "Padrão"),
+                        "imagem": opcao.get("imagem", ""),
+                        "integrador": opcao.get("integrador", ""),
+                        "observacao": opcao.get("observacao", "")
+                    } for opcao in todas_opcoes],
+                    "dados_entrega": {
+                        "valor_total_carga": sum(float(p["valor"]) for p in produtos),
+                        "peso_total": sum(float(p["peso"]) for p in produtos),
+                        "quantidade_total": sum(int(p["quantidade"]) for p in produtos)
+                    }
+                })
 
         return jsonify({
             "status": "sem_resultado",
-            "mensagem": data.get("mensagem", "Nenhuma transportadora disponível")
+            "mensagem": data.get("mensagem", "Nenhuma transportadora disponível para esta rota")
         })
 
     except requests.exceptions.RequestException as e:
-        logger.error(f"Erro API: {str(e)}")
+        logger.error(f"Erro na comunicação com a API: {str(e)}")
         return jsonify({
             "status": "erro",
-            "mensagem": f"Falha na comunicação com a transportadora: {str(e)}"
-        }), 502
+            "mensagem": f"Erro na comunicação com o sistema de fretes: {str(e)}"
+        }), 500
         
     except Exception as e:
-        logger.error(f"Erro inesperado: {str(e)}")
+        logger.error(f"Erro interno: {str(e)}")
         return jsonify({
             "status": "erro",
-            "mensagem": "Ocorreu um erro interno"
+            "mensagem": f"Erro interno no servidor: {str(e)}"
         }), 500
 
 if __name__ == "__main__":
