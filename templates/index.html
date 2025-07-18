@@ -69,7 +69,6 @@
                 <div class="form-section">
                     <h4><i class="bi bi-box-seam"></i> Dados da Carga</h4>
                     <div id="pacotes-container">
-                        <!-- Pacote padrão -->
                         <div class="pacote-container" id="pacote-0">
                             <div class="row g-3">
                                 <div class="col-md-3">
@@ -269,7 +268,7 @@
             e.target.value = value;
         });
 
-        // Envio do formulário
+        // Envio do formulário - MOSTRAR TODOS OS RESULTADOS
         document.getElementById('cotacaoForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
@@ -323,7 +322,7 @@
                     document.getElementById('resumoValor').textContent = `Valor Total: R$ ${parseFloat(data.dados_entrega.valor_total_carga).toFixed(2)}`;
                     document.getElementById('resumoCarga').style.display = 'block';
                     
-                    // Mostrar resultados em linhas
+                    // Mostrar TODOS os resultados em linhas
                     const resultadosDiv = document.getElementById('resultados');
                     
                     if (data.opcoes && data.opcoes.length > 0) {
@@ -342,7 +341,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <div class="text-center">
                                             <small class="text-muted">Prazo</small>
                                             <h5 class="mb-0">${opcao.prazo || 'N/A'} dias</h5>
@@ -354,7 +353,7 @@
                                             <h5 class="mb-0">${opcao.servico || 'Padrão'}</h5>
                                         </div>
                                     </div>
-                                    <div class="col-md-2">
+                                    <div class="col-md-3">
                                         <div class="text-end">
                                             <small class="text-muted">Valor</small>
                                             <h3 class="mb-0 text-success">R$ ${opcao.total ? parseFloat(opcao.total).toFixed(2) : '0.00'}</h3>
@@ -362,6 +361,7 @@
                                         </div>
                                     </div>
                                 </div>
+                                ${opcao.observacao ? `<div class="mt-2"><small>Obs: ${opcao.observacao}</small></div>` : ''}
                             `;
                             
                             resultadosDiv.appendChild(row);
