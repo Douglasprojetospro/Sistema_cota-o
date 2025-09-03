@@ -95,6 +95,11 @@ def pagina_selecionadas():
 def relatorios():
     return render_template("relatorios.html", solicitacoes=solicitacoes_coleta)
 
+# ========== HEALTH CHECK ==========
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
 # ========== COTAÇÃO INDIVIDUAL ==========
 @app.route("/cotar", methods=["POST"])
 def cotar():
