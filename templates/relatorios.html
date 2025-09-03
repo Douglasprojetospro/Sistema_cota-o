@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promov Logística - Relatórios de Coleta</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f4f6f9; overflow-x: hidden; }
+        .sidebar {
+            background-color: #003366;
+            color: white;
+            min-height: 100vh;
+            width: 220px;
+            position: fixed;
+        }
+        .sidebar-brand {
+            padding: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+        .sidebar-brand img {
+            max-width: 150px;
+        }
+        .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 10px 15px;
+            margin: 2px 0;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: white;
+            background-color: rgba(255,255,255,0.1);
+        }
+        .main-content {
+            margin-left: 220px;
+            padding: 30px;
+        }
+        .card-solicitacao { 
+            border-left: 4px solid #003366; 
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+        }
+        .badge-status { font-size: 0.9rem; }
+        .table-responsive { max-height: 400px; }
+    </style>
+</head>
+<body>
+    <div class="d-flex">
+        <div class="sidebar">
+            <div class="sidebar-brand">
+                <img src="/static/img/logo-promov-branco.png" alt="Promov Logística Logo">
+            </div>
+            <ul class="nav flex-column">
+                <li class="nav-item"><a class="nav-link" href="/"><i class="bi bi-house-door"></i> Início</a></li>
+                <li class="nav-item"><a class="nav-link" href="/cotacoes"><i class="bi bi-calculator"></i> Cotação</a></li>
+                <li class="nav-item"><a class="nav-link" href="/massa"><i class="bi bi-collection"></i> Cotação em Massa</a></li>
+                <li class="nav-item"><a class="nav-link active" href="/relatorios"><i class="bi bi-file-earmark-text"></i> Relatórios</a></li>
+                <li class="nav-item"><a class="nav-link" href="/selecionadas"><i class="bi bi-check-circle"></i> Selecionadas</a></li>
+                <li class="nav-item mt-auto"><a class="nav-link text-danger" href="/auth/logout"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
+            </ul>
+        </div>
+
+        <div class="main-content container-fluid">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-file-earmark-text"></i> Relatórios de Solicitações de Coleta</h2>
+                <div>
+                    <span class="badge bg-primary fs-6">{{ solicitacoes|length }} solicitações</span>
+                </div>
+            </div>
+
+            {% if solicitacoes %}
+            <div class="row">
+                {% for solicitacao in solicitacoes %}
+                <div class="col-lg-6 mb-4">
+                    <div class="card card-solicitacao shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="card-title">{{ solicitacao.cotacao.transportadora }}</h5>
+                                    <p class="card-text mb-1">
+                                        <strong>Nota Fiscal:</strong> 
+                                        {{ solicitacao.nfe_info.numero }} - Série {{ solicitacao.nfe_info.serie }}
+                                    </p>
+                                    <p class="card-text mb-1">
+                                        <strong>Valor do Frete:</strong> R$ {{ "%.2f"|format(solicitacao.cotacao.total|float) }}
+                                    </p>
+                                    <p class="card-text mb-1">
+                                        <strong>Prazo:</strong> {{ solicitacao.cotacao.prazo }}
+                                    </p>
+                                </div>
+                                <span class="badge {% if solicitacao.status == 'pendente' %}bg-warning{% else %}bg-success{% endif %} badge-status">
+                                    {{ solicitacao.status|title }}
+                                </span>
+                            </div>
+
+                            {% if solicitacao.observacoes %}
+                            <div class="alert alert-info p-2 mb-3">
+                                <small><i class="bi bi-info-circle"></i> {{ solicitacao.observacoes }}</small>
+                            </div>
+                            {% endif %}
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="bi bi-calendar"></i> 
+                                    {{ solicitacao.timestamp|format_date }}
+                                </small>
+                                <div class="btn-group">
+                                    <a href="/relatorios/{{ solicitacao.id }}/xml" target="_blank" class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-eye"></i> Ver XML
+                                    </a>
+                                    <a href="/relatorios/{{ solicitacao.id }}/download" class="btn btn-outline-secondary btn-sm">
+                                        <i class="bi bi-download"></i> Baixar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nenhuma solicitação de coleta</h3>
+                <p class="text-muted">As solicitações de coleta aparecerão aqui.</p>
+                <a href="/selecionadas" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Ver Cotações Selecionadas
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
