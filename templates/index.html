@@ -330,7 +330,6 @@
             console.log('Selecionando cotação:', opcoesCotas[index]);
             const opcao = opcoesCotas[index];
             
-            // Enviar para o endpoint /selecionadas (você precisará implementar isso no Flask)
             fetch('/selecionadas', {
                 method: 'POST',
                 headers: {
@@ -396,7 +395,7 @@
                 return;
             }
             
-            // Enviar requisição para o endpoint Flask
+            // Enviar requisição
             fetch('/cotar', {
                 method: 'POST',
                 headers: {
@@ -428,14 +427,11 @@
                     
                     if (opcoesCotas.length > 0) {
                         resultadosDiv.innerHTML = `<div class='alert alert-success'><b>${opcoesCotas.length}</b> cotações encontradas.</div>`;
-                        
-                        // Ordenar por valor total (menor primeiro)
-                        opcoesCotas.sort((a, b) => parseFloat(a.total) - parseFloat(b.total));
-                        
-                        opcoesCotas.forEach((opcao, index) => {
+                        opcoesCotas.sort((a, b) => parseFloat(a.total) - parseFloat(b.total)).forEach((opcao, index) => {
                             const totalFormatado = isNaN(parseFloat(opcao.total)) ? 'N/A' : 'R$ ' + parseFloat(opcao.total).toFixed(2).replace('.', ',');
                             const row = document.createElement('div');
                             row.className = `card mb-3 border-start border-5 ${index === 0 ? 'border-success' : 'border-secondary'} result-row ${index === 0 ? 'best-option' : ''}`;
+                            console.log('Renderizando cotação:', opcao);
                             
                             row.innerHTML = `
                                 <div class="card-body">
