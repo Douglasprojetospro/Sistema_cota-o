@@ -170,8 +170,8 @@
 
                             <div class="data-cotacao">
                                 <i class="bi bi-calendar"></i> 
-                                {{ cotacao.timestamp|string|truncate(10, True, '') }} 
-                                às {{ cotacao.timestamp|string|truncate(8, False, '')|slice(11, 16) }}
+                                {{ cotacao.timestamp.split('T')[0] }} 
+                                às {{ cotacao.timestamp.split('T')[1].split('.')[0][:5] }}
                             </div>
                         </div>
                     </div>
@@ -201,12 +201,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        // Função para extrair números de strings (para cálculo de prazo médio)
-        function extractNumber(text) {
-            const match = text ? text.match(/\d+/) : null;
-            return match ? parseInt(match[0]) : 0;
-        }
-
         // Função para limpar todas as cotações
         function limparCotações() {
             Swal.fire({
