@@ -1,38 +1,65 @@
-from flask import Flask, render_template, request, jsonify, session, send_file
+from flask import Flask, render_template, request, send_file, jsonify, session
+import pandas as pd
 import re
 import requests
 import time
 import os
+from io import BytesIO
+from werkzeug.utils import secure_filename
+import threading
+import atexit
 import logging
 import json
-from datetime import datetime
 import uuid
 import xml.etree.ElementTree as ET
-from io import BytesIO
+from datetime import datetime
 
 # Configure application
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'chave-secreta-padrao-mude-isso-em-producao')
-
-# API Configuration
-TOKEN_API = os.environ.get('TOKEN_API', "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6IjMzMSIsImNoYXZlIjoiOTI1MjRjNjI2Nzk3OTMyZWVkNTAxNjZlNjA2OGIxMTUiLCJ0aW1lc3RhbXAiOjE3NDQxOTc4MDZ9.kHED9W69zqHOH4NJ0rQh_LEmMhhWEuLlDCsVG_xe6kQ")
-URL_API = "http://sistema.prolicitante.com.br/appapi/logistica/cotar_frete_externo"
+app.config['UPLOAD_FOLDER'] = 'uploads'
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# In-memory storage for selected quotes and XML files
+# API Configuration
+TOKEN_API = os.environ.get('TOKEN_API', "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6IjMzMSIsImNoYXZlIjoiOTI1MjRjNjI2Nzk3OTMyZWVkNTAxNjZlNjA2OGIxMTUiLCJ0aW1lc3RhbXAiOjE3NDQxOTc4MDZ9.kHED9W69zqHOH4NJ0rQh_LEmMhhWEuLlDCsVG_xe6kQ")
+URL_API = "http://sistema.prolicitante.com.br/appapi/logistica/cotar_frete_externo"
+
+# Configurações para cotação em massa
+ALLOWED_EXTENSIONS = {'xlsx'}
+
+# Variáveis globais
 cotações_selecionadas = []
 solicitacoes_coleta = []
 
+# Variável global para progresso da cotação em massa
+class ProgressState:
+    def __init__(self):
+        self.total = 0
+        self.atual = 0
+        self.processando = False
+        self.arquivo = None
+        self.erro = None
+        self.nome_arquivo = None
+        self.cancelar = False
+        self.thread = None
+        self.controle_requisicoes = [0, time.time()]
+        self.tipo_retorno = 'mais_barata'
+
+progresso = ProgressState()
+
+# Funções auxiliares
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 def limpar_cnpj(cnpj):
-    """Remove all non-digit characters from CNPJ/CPF"""
     return re.sub(r'\D', '', str(cnpj))
 
 @app.template_filter('extract_number')
 def extract_number_filter(text):
-    """Filtro para extrair números de strings"""
     import re
     if text:
         match = re.search(r'\d+', str(text))
@@ -41,27 +68,40 @@ def extract_number_filter(text):
 
 @app.template_filter('format_date')
 def format_date_filter(date_string):
-    """Formata a data para exibição"""
     try:
         date_obj = datetime.fromisoformat(date_string.replace('Z', ''))
         return date_obj.strftime('%d/%m/%Y %H:%M')
     except:
         return date_string
 
+# ========== ROTAS PRINCIPAIS ==========
 @app.route("/")
 def index():
-    """Main page route"""
     return render_template("index.html")
 
+@app.route("/cotacoes")
+def cotacoes():
+    return render_template("index.html")
+
+@app.route("/massa")
+def massa():
+    return render_template("massa.html")
+
+@app.route("/selecionadas")
+def pagina_selecionadas():
+    return render_template("selecionadas.html", cotações=cotações_selecionadas)
+
+@app.route("/relatorios")
+def relatorios():
+    return render_template("relatorios.html", solicitacoes=solicitacoes_coleta)
+
+# ========== COTAÇÃO INDIVIDUAL ==========
 @app.route("/cotar", methods=["POST"])
 def cotar():
-    """Freight calculation endpoint"""
     try:
-        # Get form data
         dados = request.form.to_dict()
         logger.info(f"Dados recebidos: {dados}")
 
-        # Validate required fields
         campos_obrigatorios = ['cnpj_origem', 'cep_origem', 'cnpj_destino', 'cep_destino']
         for campo in campos_obrigatorios:
             if not dados.get(campo):
@@ -69,7 +109,6 @@ def cotar():
                 logger.error(error_msg)
                 return jsonify({"status": "erro", "mensagem": error_msg}), 400
 
-        # Process multiple packages
         produtos = []
         i = 0
         while True:
@@ -92,7 +131,6 @@ def cotar():
             })
             i += 1
 
-        # Prepare API payload with fixed ID 9
         payload = {
             "id_contrato_transportadora_segmento": "1",
             "cnpj_origem": limpar_cnpj(dados["cnpj_origem"]),
@@ -111,13 +149,10 @@ def cotar():
             "Content-Type": "application/json"
         }
 
-        # Make API request
         response = requests.post(URL_API, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
         data = response.json()
-        logger.info(f"Resposta completa da API: {data}")
 
-        # Process all results without filtering
         if isinstance(data, dict) and "resultado" in data:
             todas_opcoes = data["resultado"]
             
@@ -159,21 +194,16 @@ def cotar():
             "mensagem": f"Erro interno no servidor: {str(e)}"
         }), 500
 
+# ========== COTAÇÕES SELECIONADAS ==========
 @app.route("/selecionadas", methods=["POST", "GET"])
 def selecionadas():
-    """Endpoint para gerenciar cotações selecionadas"""
     global cotações_selecionadas
     
     if request.method == "POST":
         try:
-            # Receber dados da cotação selecionada
             dados_cotacao = request.get_json()
-            
-            # Adicionar ID único e timestamp
             dados_cotacao["id"] = str(uuid.uuid4())
             dados_cotacao["timestamp"] = datetime.now().isoformat()
-            
-            # Adicionar à lista de cotações selecionadas
             cotações_selecionadas.append(dados_cotacao)
             
             logger.info(f"Cotação selecionada: {dados_cotacao['transportadora']}")
@@ -192,66 +222,59 @@ def selecionadas():
             }), 500
             
     elif request.method == "GET":
-        # Renderizar página de cotações selecionadas
-        return render_template("selecionadas.html", cotações=cotações_selecionadas)
+        return jsonify({
+            "status": "sucesso",
+            "cotações_selecionadas": cotações_selecionadas,
+            "total": len(cotações_selecionadas)
+        })
 
 @app.route("/selecionadas/<cotacao_id>", methods=["DELETE"])
 def remover_cotacao(cotacao_id):
-    """Endpoint para remover uma cotação específica"""
     global cotações_selecionadas
+    cotações_selecionadas = [c for c in cotações_selecionadas if c.get('id') != cotacao_id]
     
-    try:
-        # Encontrar e remover a cotação
-        cotações_selecionadas = [c for c in cotações_selecionadas if c.get('id') != cotacao_id]
-        
-        return jsonify({
-            "status": "sucesso",
-            "mensagem": "Cotação removida com sucesso",
-            "total_selecionadas": len(cotações_selecionadas)
-        })
-        
-    except Exception as e:
-        logger.error(f"Erro ao remover cotação: {str(e)}")
-        return jsonify({
-            "status": "erro",
-            "mensagem": f"Erro ao remover cotação: {str(e)}"
-        }), 500
+    return jsonify({
+        "status": "sucesso",
+        "mensagem": "Cotação removida com sucesso",
+        "total_selecionadas": len(cotações_selecionadas)
+    })
 
+@app.route("/selecionadas/limpar", methods=["POST"])
+def limpar_selecionadas():
+    global cotações_selecionadas
+    cotações_selecionadas = []
+    
+    return jsonify({
+        "status": "sucesso",
+        "mensagem": "Cotações selecionadas foram limpas"
+    })
+
+# ========== SOLICITAÇÃO DE COLETA ==========
 @app.route("/solicitar-coleta", methods=["POST"])
 def solicitar_coleta():
-    """Endpoint para solicitar coleta com XML"""
     global solicitacoes_coleta
     
     try:
-        # Verificar se foi enviado um arquivo
         if 'xml_file' not in request.files:
             return jsonify({"status": "erro", "mensagem": "Nenhum arquivo enviado"}), 400
         
         file = request.files['xml_file']
-        
-        # Verificar se o arquivo tem um nome
         if file.filename == '':
             return jsonify({"status": "erro", "mensagem": "Nenhum arquivo selecionado"}), 400
         
-        # Verificar se é um arquivo XML
         if not file.filename.lower().endswith('.xml'):
             return jsonify({"status": "erro", "mensagem": "O arquivo deve ser XML"}), 400
         
-        # Ler e processar o XML
         xml_content = file.read()
         
         try:
-            # Tentar parsear o XML para validar
             root = ET.fromstring(xml_content)
-            
-            # Extrair informações básicas do XML (exemplo para NFe)
             nfe_info = {}
             try:
                 nfe_info['numero'] = root.find('.//{http://www.portalfiscal.inf.br/nfe}nNF').text
                 nfe_info['serie'] = root.find('.//{http://www.portalfiscal.inf.br/nfe}serie').text
                 nfe_info['data_emissao'] = root.find('.//{http://www.portalfiscal.inf.br/nfe}dhEmi').text
             except:
-                # Se não for NFe padrão, usar informações básicas
                 nfe_info['numero'] = "Não identificado"
                 nfe_info['serie'] = "Não identificada"
                 nfe_info['data_emissao'] = datetime.now().isoformat()
@@ -259,17 +282,14 @@ def solicitar_coleta():
         except ET.ParseError:
             return jsonify({"status": "erro", "mensagem": "Arquivo XML inválido"}), 400
         
-        # Obter dados do formulário
         cotacao_id = request.form.get('cotacao_id')
         observacoes = request.form.get('observacoes', '')
         
-        # Encontrar a cotação correspondente
         cotacao = next((c for c in cotações_selecionadas if c.get('id') == cotacao_id), None)
         
         if not cotacao:
             return jsonify({"status": "erro", "mensagem": "Cotação não encontrada"}), 404
         
-        # Criar solicitação de coleta
         solicitacao = {
             "id": str(uuid.uuid4()),
             "cotacao_id": cotacao_id,
@@ -282,10 +302,7 @@ def solicitar_coleta():
             "timestamp": datetime.now().isoformat()
         }
         
-        # Adicionar à lista de solicitações
         solicitacoes_coleta.append(solicitacao)
-        
-        logger.info(f"Solicitação de coleta criada: {solicitacao['id']}")
         
         return jsonify({
             "status": "sucesso",
@@ -300,62 +317,303 @@ def solicitar_coleta():
             "mensagem": f"Erro ao processar solicitação: {str(e)}"
         }), 500
 
-@app.route("/relatorios")
-def relatorios():
-    """Página de relatórios com solicitações de coleta"""
-    return render_template("relatorios.html", solicitacoes=solicitacoes_coleta)
-
 @app.route("/relatorios/<solicitacao_id>/xml")
 def visualizar_xml(solicitacao_id):
-    """Endpoint para visualizar XML de uma solicitação"""
-    try:
-        # Encontrar a solicitação
-        solicitacao = next((s for s in solicitacoes_coleta if s.get('id') == solicitacao_id), None)
-        
-        if not solicitacao:
-            return "Solicitação não encontrada", 404
-        
-        # Retornar o XML formatado
-        return f"<pre>{solicitacao['xml_content']}</pre>"
-        
-    except Exception as e:
-        logger.error(f"Erro ao visualizar XML: {str(e)}")
-        return f"Erro ao visualizar XML: {str(e)}", 500
+    solicitacao = next((s for s in solicitacoes_coleta if s.get('id') == solicitacao_id), None)
+    if not solicitacao:
+        return "Solicitação não encontrada", 404
+    return f"<pre>{solicitacao['xml_content']}</pre>"
 
 @app.route("/relatorios/<solicitacao_id>/download")
 def download_xml(solicitacao_id):
-    """Endpoint para download do XML"""
+    solicitacao = next((s for s in solicitacoes_coleta if s.get('id') == solicitacao_id), None)
+    if not solicitacao:
+        return "Solicitação não encontrada", 404
+    
+    xml_bytes = BytesIO(solicitacao['xml_content'].encode('utf-8'))
+    return send_file(
+        xml_bytes,
+        as_attachment=True,
+        download_name=solicitacao['xml_filename'],
+        mimetype='application/xml'
+    )
+
+# ========== COTAÇÃO EM MASSA ==========
+def gerar_modelo():
+    dados_modelo = [{
+        "id_contrato_transportadora_segmento": 1,
+        "cnpj_origem": "48.566.347/0001-22",
+        "cep_origem": "88504-357",
+        "estado_origem": "SC",
+        "cidade_origem": "Lages",
+        "cnpj_destino": "11.417.744/0001-22",
+        "cep_destino": "89660-000",
+        "estado_destino": "SC",
+        "cidade_destino": "LACERDOPOLIS",
+        "descricao": "Produto 1",
+        "quantidade": 1,
+        "peso": 20.5,
+        "altura": 0.3,
+        "largura": 0.4,
+        "profundidade": 0.5,
+        "valor": 500,
+        "observacao": "Embalagem frágil"
+    }]
+    
+    df = pd.DataFrame(dados_modelo)
+    output = BytesIO()
+    df.to_excel(output, index=False)
+    output.seek(0)
+    return output
+
+def processar_cotacao_massa(row):
+    payload = {
+        "id_contrato_transportadora_segmento": str(row["id_contrato_transportadora_segmento"]),
+        "cnpj_origem": limpar_cnpj(row["cnpj_origem"]),
+        "cep_origem": row["cep_origem"],
+        "estado_origem": row["estado_origem"],
+        "cidade_origem": row["cidade_origem"],
+        "cnpj_destino": limpar_cnpj(row["cnpj_destino"]),
+        "cep_destino": row["cep_destino"],
+        "estado_destino": row["estado_destino"],
+        "cidade_destino": row["cidade_destino"],
+        "produtos": [{
+            "descricao": row["descricao"],
+            "quantidade": str(row["quantidade"]),
+            "peso": str(row["peso"]),
+            "altura": str(row["altura"]),
+            "largura": str(row["largura"]),
+            "profundidade": str(row["profundidade"]),
+            "valor": str(row["valor"])
+        }]
+    }
+
+    headers = {
+        "Authorization": TOKEN_API,
+        "Content-Type": "application/json"
+    }
+
     try:
-        # Encontrar a solicitação
-        solicitacao = next((s for s in solicitacoes_coleta if s.get('id') == solicitacao_id), None)
+        if progresso.controle_requisicoes[0] >= 15:
+            tempo_passado = time.time() - progresso.controle_requisicoes[1]
+            if tempo_passado < 10:
+                time.sleep(10 - tempo_passado)
+            progresso.controle_requisicoes[0] = 0
+            progresso.controle_requisicoes[1] = time.time()
+
+        response = requests.post(URL_API, headers=headers, json=payload, timeout=30)
+        progresso.controle_requisicoes[0] += 1
+
+        if response.status_code == 200:
+            data = response.json()
+            if isinstance(data, dict) and not data.get("erro") and "resultado" in data:
+                if data["resultado"]:
+                    mais_barata = min(data["resultado"], key=lambda x: float(x["total"]))
+                    return {
+                        "status": "sucesso",
+                        "mais_barata": mais_barata,
+                        "todas_opcoes": data["resultado"]
+                    }
+        return {"status": "sem_resultado"}
+    except Exception as e:
+        return {"status": "erro", "mensagem": str(e)}
+
+def processar_arquivo_background(filepath):
+    try:
+        df = pd.read_excel(filepath)
+        resultados = []
+        progresso.total = len(df)
+        progresso.atual = 0
+        progresso.processando = True
+        progresso.erro = None
         
-        if not solicitacao:
-            return "Solicitação não encontrada", 404
+        for _, row in df.iterrows():
+            if progresso.cancelar:
+                break
+                
+            cotacao = processar_cotacao_massa(row)
+            if cotacao["status"] == "sucesso":
+                if progresso.tipo_retorno == 'mais_barata':
+                    resultados.append({
+                        **row.to_dict(),
+                        "transportadora_mais_barata": cotacao["mais_barata"]["transportadora"],
+                        "integrador_mais_barato": cotacao["mais_barata"]["integrador"],
+                        "valor_frete_mais_barato": cotacao["mais_barata"]["total"],
+                        "prazo_mais_barato": cotacao["mais_barata"]["prazo"],
+                        "servico_mais_barato": cotacao["mais_barata"]["servico"],
+                        "imagem_mais_barata": cotacao["mais_barata"]["imagem"],
+                        "observacao_mais_barata": cotacao["mais_barata"].get("observacao", ""),
+                        "todas_opcoes": cotacao["todas_opcoes"]
+                    })
+                else:
+                    for opcao in cotacao["todas_opcoes"]:
+                        resultados.append({
+                            **row.to_dict(),
+                            "transportadora": opcao["transportadora"],
+                            "integrador": opcao["integrador"],
+                            "valor_frete": opcao["total"],
+                            "prazo": opcao["prazo"],
+                            "servico": opcao["servico"],
+                            "imagem": opcao["imagem"],
+                            "observacao": opcao.get("observacao", ""),
+                            "melhor_opcao": "Sim" if opcao == cotacao["mais_barata"] else "Não"
+                        })
+            else:
+                if progresso.tipo_retorno == 'mais_barata':
+                    resultados.append({
+                        **row.to_dict(),
+                        "transportadora_mais_barata": "N/A",
+                        "integrador_mais_barato": "N/A",
+                        "valor_frete_mais_barato": "N/A",
+                        "prazo_mais_barato": "N/A",
+                        "servico_mais_barato": "N/A",
+                        "imagem_mais_barata": "N/A",
+                        "observacao_mais_barata": "N/A",
+                        "todas_opcoes": []
+                    })
+                else:
+                    resultados.append({
+                        **row.to_dict(),
+                        "transportadora": "N/A",
+                        "integrador": "N/A",
+                        "valor_frete": "N/A",
+                        "prazo": "N/A",
+                        "servico": "N/A",
+                        "imagem": "N/A",
+                        "observacao": "N/A",
+                        "melhor_opcao": "N/A"
+                    })
+            
+            progresso.atual += 1
         
-        # Criar arquivo para download
-        xml_bytes = BytesIO(solicitacao['xml_content'].encode('utf-8'))
-        
-        return send_file(
-            xml_bytes,
-            as_attachment=True,
-            download_name=solicitacao['xml_filename'],
-            mimetype='application/xml'
-        )
+        if not progresso.cancelar:
+            df_resultado = pd.DataFrame(resultados)
+            
+            if progresso.tipo_retorno == 'mais_barata':
+                df_final = df_resultado.drop(columns=['todas_opcoes'])
+            else:
+                df_final = df_resultado
+            
+            output = BytesIO()
+            df_final.to_excel(output, index=False)
+            output.seek(0)
+            
+            progresso.arquivo = output
+            progresso.nome_arquivo = f"resultado_{secure_filename(os.path.basename(filepath))}"
         
     except Exception as e:
-        logger.error(f"Erro ao fazer download do XML: {str(e)}")
-        return f"Erro ao fazer download: {str(e)}", 500
+        progresso.erro = str(e)
+        logger.error(f"Erro no processamento: {str(e)}")
+    finally:
+        progresso.processando = False
+        try:
+            os.remove(filepath)
+        except:
+            pass
 
-@app.route("/selecionadas/limpar", methods=["POST"])
-def limpar_selecionadas():
-    """Endpoint para limpar cotações selecionadas"""
-    global cotações_selecionadas
-    cotações_selecionadas = []
+@app.route("/baixar_modelo")
+def baixar_modelo():
+    modelo = gerar_modelo()
+    return send_file(
+        modelo,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        download_name="modelo_cotacao_massa.xlsx",
+        as_attachment=True
+    )
+
+@app.route("/upload", methods=["POST"])
+def upload():
+    if 'arquivo' not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
     
-    return jsonify({
-        "status": "sucesso",
-        "mensagem": "Cotações selecionadas foram limpas"
-    })
+    file = request.files['arquivo']
+    if file.filename == '':
+        return jsonify({"erro": "Nenhum arquivo selecionado"}), 400
+    
+    if not allowed_file(file.filename):
+        return jsonify({"erro": "Tipo de arquivo não permitido"}), 400
+    
+    tipo_retorno = request.form.get('tipo_retorno', 'mais_barata')
+    progresso.tipo_retorno = tipo_retorno
+    
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+    
+    progresso.total = 0
+    progresso.atual = 0
+    progresso.processando = True
+    progresso.arquivo = None
+    progresso.erro = None
+    progresso.nome_arquivo = None
+    progresso.cancelar = False
+    progresso.controle_requisicoes = [0, time.time()]
+    
+    if progresso.thread is not None and progresso.thread.is_alive():
+        progresso.thread.join()
+    
+    progresso.thread = threading.Thread(target=processar_arquivo_background, args=(filepath,))
+    progresso.thread.start()
+    
+    return jsonify({"mensagem": "Processamento iniciado"})
+
+@app.route("/progresso")
+def obter_progresso():
+    if progresso.thread is not None and not progresso.thread.is_alive():
+        progresso.processando = False
+    
+    response_data = {
+        "processando": progresso.processando,
+        "progresso": int((progresso.atual / progresso.total) * 100) if progresso.total > 0 else 0,
+        "atual": progresso.atual,
+        "total": progresso.total
+    }
+
+    if progresso.erro:
+        response_data.update({
+            "erro": progresso.erro,
+            "processando": False
+        })
+    elif not progresso.processando and progresso.arquivo is not None:
+        response_data.update({
+            "completo": True,
+            "nome_arquivo": progresso.nome_arquivo
+        })
+    elif not progresso.processando:
+        response_data.update({
+            "erro": "Processamento não iniciado ou cancelado",
+            "processando": False
+        })
+    
+    return jsonify(response_data)
+
+@app.route("/baixar_resultado")
+def baixar_resultado():
+    if progresso.arquivo is None:
+        return jsonify({"erro": "Nenhum arquivo disponível"}), 404
+    
+    file_obj = progresso.arquivo
+    filename = progresso.nome_arquivo or "resultado_cotacoes.xlsx"
+    file_obj.seek(0)
+    
+    return send_file(
+        file_obj,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        download_name=filename,
+        as_attachment=True
+    )
+
+@app.route("/cancelar", methods=["POST"])
+def cancelar():
+    progresso.cancelar = True
+    return jsonify({"mensagem": "Processamento cancelado"})
+
+def cleanup():
+    if progresso.thread is not None and progresso.thread.is_alive():
+        progresso.cancelar = True
+        progresso.thread.join()
+
+atexit.register(cleanup)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
