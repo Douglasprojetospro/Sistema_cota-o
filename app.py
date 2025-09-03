@@ -16,7 +16,7 @@ from datetime import datetime
 
 # Configure application
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = os.environ.get('SECRET_KEY', 'chave-secreta-padrao-mude-isso-em-producao')
+app.secret_key = os.environ.get('SECRET_KEY', 'chave-secreta-padrao-mude-isso-em-producao')  # Ajuste em produção
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -101,14 +101,12 @@ def cotar():
     try:
         dados = request.form.to_dict()
         logger.info(f"Dados recebidos: {dados}")
-
         campos_obrigatorios = ['cnpj_origem', 'cep_origem', 'cnpj_destino', 'cep_destino']
         for campo in campos_obrigatorios:
             if not dados.get(campo):
                 error_msg = f"Campo obrigatório faltando: {campo}"
                 logger.error(error_msg)
                 return jsonify({"status": "erro", "mensagem": error_msg}), 400
-
         produtos = []
         i = 0
         while True:
@@ -119,7 +117,7 @@ def cotar():
                     logger.error(error_msg)
                     return jsonify({"status": "erro", "mensagem": error_msg}), 400
                 break
-                
+               
             produtos.append({
                 "descricao": f"Carga {i+1}",
                 "quantidade": dados[qtd_key],
@@ -130,7 +128,6 @@ def cotar():
                 "valor": str(float(dados.get(f"valor_unitario_{i}", "0")) * float(dados[qtd_key]))
             })
             i += 1
-
         payload = {
             "id_contrato_transportadora_segmento": "1",
             "cnpj_origem": limpar_cnpj(dados["cnpj_origem"]),
@@ -143,19 +140,18 @@ def cotar():
             "cidade_destino": "",
             "produtos": produtos
         }
-
         headers = {
             "Authorization": TOKEN_API,
             "Content-Type": "application/json"
         }
-
+        logger.info(f"Payload enviado: {json.dumps(payload, indent=2)}")  # Depuração
         response = requests.post(URL_API, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
         data = response.json()
-
+        logger.info(f"Resposta completa da API: {json.dumps(data, indent=2)}")  # Depuração detalhada
         if isinstance(data, dict) and "resultado" in data:
             todas_opcoes = data["resultado"]
-            
+            logger.info(f"Opções retornadas: {todas_opcoes}")  # Depuração
             if todas_opcoes:
                 return jsonify({
                     "status": "sucesso",
@@ -174,19 +170,17 @@ def cotar():
                         "quantidade_total": sum(int(p["quantidade"]) for p in produtos)
                     }
                 })
-
         return jsonify({
             "status": "sem_resultado",
             "mensagem": data.get("mensagem", "Nenhuma transportadora disponível para esta rota")
         })
-
     except requests.exceptions.RequestException as e:
         logger.error(f"Erro na comunicação com a API: {str(e)}")
         return jsonify({
             "status": "erro",
             "mensagem": f"Erro na comunicação com o sistema de fretes: {str(e)}"
         }), 500
-        
+       
     except Exception as e:
         logger.error(f"Erro interno: {str(e)}")
         return jsonify({
@@ -198,29 +192,28 @@ def cotar():
 @app.route("/selecionadas", methods=["POST", "GET"])
 def selecionadas():
     global cotações_selecionadas
-    
+   
     if request.method == "POST":
         try:
             dados_cotacao = request.get_json()
+            if not dados_cotacao or "transportadora" not in dados_cotacao or "total" not in dados_cotacao or "prazo" not in dados_cotacao:
+                return jsonify({"status": "erro", "mensagem": "Dados da cotação inválidos"}), 400
             dados_cotacao["id"] = str(uuid.uuid4())
             dados_cotacao["timestamp"] = datetime.now().isoformat()
             cotações_selecionadas.append(dados_cotacao)
-            
             logger.info(f"Cotação selecionada: {dados_cotacao['transportadora']}")
-            
             return jsonify({
                 "status": "sucesso",
                 "mensagem": "Cotação selecionada com sucesso",
                 "total_selecionadas": len(cotações_selecionadas)
             })
-            
         except Exception as e:
             logger.error(f"Erro ao processar cotação selecionada: {str(e)}")
             return jsonify({
                 "status": "erro",
                 "mensagem": f"Erro ao processar cotação: {str(e)}"
             }), 500
-            
+           
     elif request.method == "GET":
         return jsonify({
             "status": "sucesso",
@@ -232,7 +225,6 @@ def selecionadas():
 def remover_cotacao(cotacao_id):
     global cotações_selecionadas
     cotações_selecionadas = [c for c in cotações_selecionadas if c.get('id') != cotacao_id]
-    
     return jsonify({
         "status": "sucesso",
         "mensagem": "Cotação removida com sucesso",
@@ -243,7 +235,6 @@ def remover_cotacao(cotacao_id):
 def limpar_selecionadas():
     global cotações_selecionadas
     cotações_selecionadas = []
-    
     return jsonify({
         "status": "sucesso",
         "mensagem": "Cotações selecionadas foram limpas"
@@ -253,20 +244,20 @@ def limpar_selecionadas():
 @app.route("/solicitar-coleta", methods=["POST"])
 def solicitar_coleta():
     global solicitacoes_coleta
-    
+   
     try:
         if 'xml_file' not in request.files:
             return jsonify({"status": "erro", "mensagem": "Nenhum arquivo enviado"}), 400
-        
+       
         file = request.files['xml_file']
         if file.filename == '':
             return jsonify({"status": "erro", "mensagem": "Nenhum arquivo selecionado"}), 400
-        
+       
         if not file.filename.lower().endswith('.xml'):
             return jsonify({"status": "erro", "mensagem": "O arquivo deve ser XML"}), 400
-        
+       
         xml_content = file.read()
-        
+       
         try:
             root = ET.fromstring(xml_content)
             nfe_info = {}
@@ -278,18 +269,18 @@ def solicitar_coleta():
                 nfe_info['numero'] = "Não identificado"
                 nfe_info['serie'] = "Não identificada"
                 nfe_info['data_emissao'] = datetime.now().isoformat()
-            
+           
         except ET.ParseError:
             return jsonify({"status": "erro", "mensagem": "Arquivo XML inválido"}), 400
-        
+       
         cotacao_id = request.form.get('cotacao_id')
         observacoes = request.form.get('observacoes', '')
-        
+       
         cotacao = next((c for c in cotações_selecionadas if c.get('id') == cotacao_id), None)
-        
+       
         if not cotacao:
             return jsonify({"status": "erro", "mensagem": "Cotação não encontrada"}), 404
-        
+       
         solicitacao = {
             "id": str(uuid.uuid4()),
             "cotacao_id": cotacao_id,
@@ -301,15 +292,15 @@ def solicitar_coleta():
             "status": "pendente",
             "timestamp": datetime.now().isoformat()
         }
-        
+       
         solicitacoes_coleta.append(solicitacao)
-        
+       
         return jsonify({
             "status": "sucesso",
             "mensagem": "Solicitação de coleta criada com sucesso",
             "solicitacao_id": solicitacao['id']
         })
-        
+       
     except Exception as e:
         logger.error(f"Erro ao processar solicitação de coleta: {str(e)}")
         return jsonify({
@@ -329,7 +320,7 @@ def download_xml(solicitacao_id):
     solicitacao = next((s for s in solicitacoes_coleta if s.get('id') == solicitacao_id), None)
     if not solicitacao:
         return "Solicitação não encontrada", 404
-    
+   
     xml_bytes = BytesIO(solicitacao['xml_content'].encode('utf-8'))
     return send_file(
         xml_bytes,
@@ -359,7 +350,7 @@ def gerar_modelo():
         "valor": 500,
         "observacao": "Embalagem frágil"
     }]
-    
+   
     df = pd.DataFrame(dados_modelo)
     output = BytesIO()
     df.to_excel(output, index=False)
@@ -387,12 +378,10 @@ def processar_cotacao_massa(row):
             "valor": str(row["valor"])
         }]
     }
-
     headers = {
         "Authorization": TOKEN_API,
         "Content-Type": "application/json"
     }
-
     try:
         if progresso.controle_requisicoes[0] >= 15:
             tempo_passado = time.time() - progresso.controle_requisicoes[1]
@@ -400,10 +389,8 @@ def processar_cotacao_massa(row):
                 time.sleep(10 - tempo_passado)
             progresso.controle_requisicoes[0] = 0
             progresso.controle_requisicoes[1] = time.time()
-
         response = requests.post(URL_API, headers=headers, json=payload, timeout=30)
         progresso.controle_requisicoes[0] += 1
-
         if response.status_code == 200:
             data = response.json()
             if isinstance(data, dict) and not data.get("erro") and "resultado" in data:
@@ -414,7 +401,7 @@ def processar_cotacao_massa(row):
                         "mais_barata": mais_barata,
                         "todas_opcoes": data["resultado"]
                     }
-        return {"status": "sem_resultado"}
+        return {"status": "sem_resultado", "mensagem": data.get("mensagem", "Nenhuma cotação disponível")}
     except Exception as e:
         return {"status": "erro", "mensagem": str(e)}
 
@@ -426,11 +413,11 @@ def processar_arquivo_background(filepath):
         progresso.atual = 0
         progresso.processando = True
         progresso.erro = None
-        
+       
         for _, row in df.iterrows():
             if progresso.cancelar:
                 break
-                
+               
             cotacao = processar_cotacao_massa(row)
             if cotacao["status"] == "sucesso":
                 if progresso.tipo_retorno == 'mais_barata':
@@ -442,8 +429,7 @@ def processar_arquivo_background(filepath):
                         "prazo_mais_barato": cotacao["mais_barata"]["prazo"],
                         "servico_mais_barato": cotacao["mais_barata"]["servico"],
                         "imagem_mais_barata": cotacao["mais_barata"]["imagem"],
-                        "observacao_mais_barata": cotacao["mais_barata"].get("observacao", ""),
-                        "todas_opcoes": cotacao["todas_opcoes"]
+                        "observacao_mais_barata": cotacao["mais_barata"].get("observacao", "")
                     })
                 else:
                     for opcao in cotacao["todas_opcoes"]:
@@ -459,48 +445,29 @@ def processar_arquivo_background(filepath):
                             "melhor_opcao": "Sim" if opcao == cotacao["mais_barata"] else "Não"
                         })
             else:
-                if progresso.tipo_retorno == 'mais_barata':
-                    resultados.append({
-                        **row.to_dict(),
-                        "transportadora_mais_barata": "N/A",
-                        "integrador_mais_barato": "N/A",
-                        "valor_frete_mais_barato": "N/A",
-                        "prazo_mais_barato": "N/A",
-                        "servico_mais_barato": "N/A",
-                        "imagem_mais_barata": "N/A",
-                        "observacao_mais_barata": "N/A",
-                        "todas_opcoes": []
-                    })
-                else:
-                    resultados.append({
-                        **row.to_dict(),
-                        "transportadora": "N/A",
-                        "integrador": "N/A",
-                        "valor_frete": "N/A",
-                        "prazo": "N/A",
-                        "servico": "N/A",
-                        "imagem": "N/A",
-                        "observacao": "N/A",
-                        "melhor_opcao": "N/A"
-                    })
-            
+                resultados.append({
+                    **row.to_dict(),
+                    "status": cotacao["status"],
+                    "mensagem": cotacao.get("mensagem", "Erro na cotação")
+                })
+           
             progresso.atual += 1
-        
+       
         if not progresso.cancelar:
             df_resultado = pd.DataFrame(resultados)
-            
+           
             if progresso.tipo_retorno == 'mais_barata':
-                df_final = df_resultado.drop(columns=['todas_opcoes'])
+                df_final = df_resultado.drop(columns=['todas_opcoes'] if 'todas_opcoes' in df_resultado.columns else [])
             else:
                 df_final = df_resultado
-            
+           
             output = BytesIO()
             df_final.to_excel(output, index=False)
             output.seek(0)
-            
+           
             progresso.arquivo = output
             progresso.nome_arquivo = f"resultado_{secure_filename(os.path.basename(filepath))}"
-        
+       
     except Exception as e:
         progresso.erro = str(e)
         logger.error(f"Erro no processamento: {str(e)}")
@@ -525,21 +492,21 @@ def baixar_modelo():
 def upload():
     if 'arquivo' not in request.files:
         return jsonify({"erro": "Nenhum arquivo enviado"}), 400
-    
+   
     file = request.files['arquivo']
     if file.filename == '':
         return jsonify({"erro": "Nenhum arquivo selecionado"}), 400
-    
+   
     if not allowed_file(file.filename):
         return jsonify({"erro": "Tipo de arquivo não permitido"}), 400
-    
+   
     tipo_retorno = request.form.get('tipo_retorno', 'mais_barata')
     progresso.tipo_retorno = tipo_retorno
-    
+   
     filename = secure_filename(file.filename)
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
-    
+   
     progresso.total = 0
     progresso.atual = 0
     progresso.processando = True
@@ -548,27 +515,26 @@ def upload():
     progresso.nome_arquivo = None
     progresso.cancelar = False
     progresso.controle_requisicoes = [0, time.time()]
-    
+   
     if progresso.thread is not None and progresso.thread.is_alive():
         progresso.thread.join()
-    
+   
     progresso.thread = threading.Thread(target=processar_arquivo_background, args=(filepath,))
     progresso.thread.start()
-    
+   
     return jsonify({"mensagem": "Processamento iniciado"})
 
 @app.route("/progresso")
 def obter_progresso():
     if progresso.thread is not None and not progresso.thread.is_alive():
         progresso.processando = False
-    
+   
     response_data = {
         "processando": progresso.processando,
         "progresso": int((progresso.atual / progresso.total) * 100) if progresso.total > 0 else 0,
         "atual": progresso.atual,
         "total": progresso.total
     }
-
     if progresso.erro:
         response_data.update({
             "erro": progresso.erro,
@@ -584,18 +550,18 @@ def obter_progresso():
             "erro": "Processamento não iniciado ou cancelado",
             "processando": False
         })
-    
+   
     return jsonify(response_data)
 
 @app.route("/baixar_resultado")
 def baixar_resultado():
     if progresso.arquivo is None:
         return jsonify({"erro": "Nenhum arquivo disponível"}), 404
-    
+   
     file_obj = progresso.arquivo
     filename = progresso.nome_arquivo or "resultado_cotacoes.xlsx"
     file_obj.seek(0)
-    
+   
     return send_file(
         file_obj,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
