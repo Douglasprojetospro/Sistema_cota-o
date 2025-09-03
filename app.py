@@ -69,7 +69,7 @@ def extract_number_filter(text):
 @app.template_filter('format_date')
 def format_date_filter(date_string):
     try:
-        date_obj = datetime.fromisoformat(date_string.replace('Z', ''))
+        date_obj = datetime.fromisoformat(date_string.replace('Z', '+00:00'))
         return date_obj.strftime('%d/%m/%Y %H:%M')
     except:
         return date_string
@@ -391,18 +391,18 @@ def processar_cotacao_massa(row):
             progresso.controle_requisicoes[1] = time.time()
         response = requests.post(URL_API, headers=headers, json=payload, timeout=30)
         progresso.controle_requisicoes[0] += 1
-        if response.status_code == 200:
-            data = response.json()
-            if isinstance(data, dict) and not data.get("erro") and "resultado" in data:
-                if data["resultado"]:
-                    mais_barata = min(data["resultado"], key=lambda x: float(x["total"]))
-                    return {
-                        "status": "sucesso",
-                        "mais_barata": mais_barata,
-                        "todas_opcoes": data["resultado"]
-                    }
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, dict) and not data.get("erro") and "resultado" in data:
+            if data["resultado"]:
+                mais_barata = min(data["resultado"], key=lambda x: float(x["total"]))
+                return {
+                    "status": "sucesso",
+                    "mais_barata": mais_barata,
+                    "todas_opcoes": data["resultado"]
+                }
         return {"status": "sem_resultado", "mensagem": data.get("mensagem", "Nenhuma cotação disponível")}
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         return {"status": "erro", "mensagem": str(e)}
 
 def processar_arquivo_background(filepath):
