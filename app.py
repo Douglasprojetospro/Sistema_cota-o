@@ -29,6 +29,15 @@ def limpar_cnpj(cnpj):
     """Remove all non-digit characters from CNPJ/CPF"""
     return re.sub(r'\D', '', str(cnpj))
 
+@app.template_filter('extract_number')
+def extract_number_filter(text):
+    """Filtro para extrair números de strings"""
+    import re
+    if text:
+        match = re.search(r'\d+', str(text))
+        return int(match.group()) if match else 0
+    return 0
+
 @app.route("/")
 def index():
     """Main page route"""
@@ -174,12 +183,18 @@ def selecionadas():
             }), 500
             
     elif request.method == "GET":
-        # Retornar lista de cotações selecionadas
-        return jsonify({
-            "status": "sucesso",
-            "cotações_selecionadas": cotações_selecionadas,
-            "total": len(cotações_selecionadas)
-        })
+        # Renderizar página de cotações selecionadas
+        return render_template("selecionadas.html", cotações=cotações_selecionadas)
+
+@app.route("/api/selecionadas", methods=["GET"])
+def api_selecionadas():
+    """API endpoint para obter cotações selecionadas (JSON)"""
+    global cotações_selecionadas
+    return jsonify({
+        "status": "sucesso",
+        "cotações_selecionadas": cotações_selecionadas,
+        "total": len(cotações_selecionadas)
+    })
 
 @app.route("/selecionadas/limpar", methods=["POST"])
 def limpar_selecionadas():
