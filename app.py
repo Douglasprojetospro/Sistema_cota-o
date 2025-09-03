@@ -1,12 +1,15 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 import re
 import requests
 import time
 import os
 import logging
+import json
+from datetime import datetime
 
 # Configure application
 app = Flask(__name__, static_folder='static', template_folder='templates')
+app.secret_key = os.environ.get('SECRET_KEY', 'chave-secreta-padrao-mude-isso-em-producao')
 
 # API Configuration
 TOKEN_API = os.environ.get('TOKEN_API', "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6IjMzMSIsImNoYXZlIjoiOTI1MjRjNjI2Nzk3OTMyZWVkNTAxNjZlNjA2OGIxMTUiLCJ0aW1lc3RhbXAiOjE3NDQxOTc4MDZ9.kHED9W69zqHOH4NJ0rQh_LEmMhhWEuLlDCsVG_xe6kQ")
@@ -18,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 # Rate limiting control
 controle_requisicoes = [0, time.time()]
+
+# In-memory storage for selected quotes (in production, use a database)
+cotações_selecionadas = []
 
 def limpar_cnpj(cnpj):
     """Remove all non-digit characters from CNPJ/CPF"""
@@ -136,6 +142,56 @@ def cotar():
             "mensagem": f"Erro interno no servidor: {str(e)}"
         }), 500
 
+@app.route("/selecionadas", methods=["POST", "GET"])
+def selecionadas():
+    """Endpoint para gerenciar cotações selecionadas"""
+    global cotações_selecionadas
+    
+    if request.method == "POST":
+        try:
+            # Receber dados da cotação selecionada
+            dados_cotacao = request.get_json()
+            
+            # Adicionar timestamp
+            dados_cotacao["timestamp"] = datetime.now().isoformat()
+            
+            # Adicionar à lista de cotações selecionadas
+            cotações_selecionadas.append(dados_cotacao)
+            
+            logger.info(f"Cotação selecionada: {dados_cotacao}")
+            
+            return jsonify({
+                "status": "sucesso",
+                "mensagem": "Cotação selecionada com sucesso",
+                "total_selecionadas": len(cotações_selecionadas)
+            })
+            
+        except Exception as e:
+            logger.error(f"Erro ao processar cotação selecionada: {str(e)}")
+            return jsonify({
+                "status": "erro",
+                "mensagem": f"Erro ao processar cotação: {str(e)}"
+            }), 500
+            
+    elif request.method == "GET":
+        # Retornar lista de cotações selecionadas
+        return jsonify({
+            "status": "sucesso",
+            "cotações_selecionadas": cotações_selecionadas,
+            "total": len(cotações_selecionadas)
+        })
+
+@app.route("/selecionadas/limpar", methods=["POST"])
+def limpar_selecionadas():
+    """Endpoint para limpar cotações selecionadas"""
+    global cotações_selecionadas
+    cotações_selecionadas = []
+    
+    return jsonify({
+        "status": "sucesso",
+        "mensagem": "Cotações selecionadas foram limpas"
+    })
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=True)
