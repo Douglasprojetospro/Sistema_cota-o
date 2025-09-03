@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, jsonify, session
+from flask import Flask, render_template, request, send_file, jsonify, session, g
 import pandas as pd
 import re
 import requests
@@ -13,11 +13,19 @@ import json
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime
+from functools import wraps
 
 # Configure application
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = os.environ.get('SECRET_KEY', 'chave-secreta-padrao-mude-isso-em-producao')  # Ajuste em produção
+app.secret_key = os.environ.get('SECRET_KEY')
+if not app.secret_key:
+    if os.environ.get('FLASK_ENV') == 'development':
+        app.secret_key = 'chave-desenvolvimento-apenas-para-testes'
+    else:
+        raise RuntimeError("SECRET_KEY não configurada para ambiente de produção")
+
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Configure logging
@@ -31,11 +39,39 @@ URL_API = "http://sistema.prolicitante.com.br/appapi/logistica/cotar_frete_exter
 # Configurações para cotação em massa
 ALLOWED_EXTENSIONS = {'xlsx'}
 
-# Variáveis globais
-cotações_selecionadas = []
-solicitacoes_coleta = []
+# Armazenamento thread-safe para substituir variáveis globais
+class ThreadSafeStorage:
+    def __init__(self):
+        self._data = {}
+        self._lock = threading.Lock()
+    
+    def get(self, key, default=None):
+        with self._lock:
+            return self._data.get(key, default)
+    
+    def set(self, key, value):
+        with self._lock:
+            self._data[key] = value
+    
+    def append(self, key, item):
+        with self._lock:
+            if key not in self._data:
+                self._data[key] = []
+            self._data[key].append(item)
+    
+    def remove(self, key, item_id):
+        with self._lock:
+            if key in self._data:
+                self._data[key] = [item for item in self._data[key] if item.get('id') != item_id]
+    
+    def clear(self, key):
+        with self._lock:
+            if key in self._data:
+                self._data[key] = []
 
-# Variável global para progresso da cotação em massa
+storage = ThreadSafeStorage()
+
+# Variável global para progresso da cotação em massa (mantida por compatibilidade)
 class ProgressState:
     def __init__(self):
         self.total = 0
@@ -58,9 +94,48 @@ def allowed_file(filename):
 def limpar_cnpj(cnpj):
     return re.sub(r'\D', '', str(cnpj))
 
+def validate_excel_file(file):
+    if not file or file.filename == '':
+        return False, "Nenhum arquivo selecionado"
+    
+    if not allowed_file(file.filename):
+        return False, "Tipo de arquivo não permitido"
+    
+    # Verificar se é realmente um arquivo Excel
+    try:
+        file.stream.seek(0)
+        pd.read_excel(file.stream)
+        file.stream.seek(0)  # Reset stream position
+        return True, "Arquivo válido"
+    except Exception as e:
+        return False, f"Arquivo Excel inválido: {str(e)}"
+
+def validate_cotacao_data(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        dados = request.get_json() if request.is_json else request.form.to_dict()
+        
+        # Validação de campos obrigatórios
+        campos_obrigatorios = ['cnpj_origem', 'cep_origem', 'cnpj_destino', 'cep_destino']
+        for campo in campos_obrigatorios:
+            if not dados.get(campo):
+                error_msg = f"Campo obrigatório faltando: {campo}"
+                logger.error(error_msg)
+                return jsonify({"status": "erro", "mensagem": error_msg}), 400
+        
+        # Validação de formato de CEP
+        cep_pattern = re.compile(r'^\d{5}-?\d{3}$')
+        if not cep_pattern.match(dados['cep_origem']) or not cep_pattern.match(dados['cep_destino']):
+            return jsonify({
+                "status": "erro",
+                "mensagem": "Formato de CEP inválido"
+            }), 400
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.template_filter('extract_number')
 def extract_number_filter(text):
-    import re
     if text:
         match = re.search(r'\d+', str(text))
         return int(match.group()) if match else 0
@@ -69,10 +144,24 @@ def extract_number_filter(text):
 @app.template_filter('format_date')
 def format_date_filter(date_string):
     try:
-        date_obj = datetime.fromisoformat(date_string.replace('Z', '+00:00'))
+        date_obj = datetime.fromisoformat(date_string.replace('Z', ''))
         return date_obj.strftime('%d/%m/%Y %H:%M')
     except:
         return date_string
+
+# Handlers de erro
+@app.errorhandler(404)
+def not_found_error(error):
+    return jsonify({"status": "erro", "mensagem": "Recurso não encontrado"}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Erro interno do servidor: {str(error)}")
+    return jsonify({"status": "erro", "mensagem": "Erro interno do servidor"}), 500
+
+@app.errorhandler(413)
+def too_large(error):
+    return jsonify({"status": "erro", "mensagem": "Arquivo muito grande"}), 413
 
 # ========== ROTAS PRINCIPAIS ==========
 @app.route("/")
@@ -89,24 +178,22 @@ def massa():
 
 @app.route("/selecionadas")
 def pagina_selecionadas():
-    return render_template("selecionadas.html", cotações=cotações_selecionadas)
+    cotações = storage.get('cotações_selecionadas', [])
+    return render_template("selecionadas.html", cotações=cotações)
 
 @app.route("/relatorios")
 def relatorios():
-    return render_template("relatorios.html", solicitacoes=solicitacoes_coleta)
+    solicitacoes = storage.get('solicitacoes_coleta', [])
+    return render_template("relatorios.html", solicitacoes=solicitacoes)
 
 # ========== COTAÇÃO INDIVIDUAL ==========
 @app.route("/cotar", methods=["POST"])
+@validate_cotacao_data
 def cotar():
     try:
         dados = request.form.to_dict()
         logger.info(f"Dados recebidos: {dados}")
-        campos_obrigatorios = ['cnpj_origem', 'cep_origem', 'cnpj_destino', 'cep_destino']
-        for campo in campos_obrigatorios:
-            if not dados.get(campo):
-                error_msg = f"Campo obrigatório faltando: {campo}"
-                logger.error(error_msg)
-                return jsonify({"status": "erro", "mensagem": error_msg}), 400
+        
         produtos = []
         i = 0
         while True:
@@ -128,6 +215,7 @@ def cotar():
                 "valor": str(float(dados.get(f"valor_unitario_{i}", "0")) * float(dados[qtd_key]))
             })
             i += 1
+            
         payload = {
             "id_contrato_transportadora_segmento": "1",
             "cnpj_origem": limpar_cnpj(dados["cnpj_origem"]),
@@ -140,18 +228,22 @@ def cotar():
             "cidade_destino": "",
             "produtos": produtos
         }
+        
         headers = {
             "Authorization": TOKEN_API,
             "Content-Type": "application/json"
         }
-        logger.info(f"Payload enviado: {json.dumps(payload, indent=2)}")  # Depuração
+        
+        logger.info(f"Payload enviado: {json.dumps(payload, indent=2)}")
         response = requests.post(URL_API, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
         data = response.json()
-        logger.info(f"Resposta completa da API: {json.dumps(data, indent=2)}")  # Depuração detalhada
+        logger.info(f"Resposta completa da API: {json.dumps(data, indent=2)}")
+        
         if isinstance(data, dict) and "resultado" in data:
             todas_opcoes = data["resultado"]
-            logger.info(f"Opções retornadas: {todas_opcoes}")  # Depuração
+            logger.info(f"Opções retornadas: {todas_opcoes}")
+            
             if todas_opcoes:
                 return jsonify({
                     "status": "sucesso",
@@ -170,10 +262,12 @@ def cotar():
                         "quantidade_total": sum(int(p["quantidade"]) for p in produtos)
                     }
                 })
+
         return jsonify({
             "status": "sem_resultado",
             "mensagem": data.get("mensagem", "Nenhuma transportadora disponível para esta rota")
         })
+        
     except requests.exceptions.RequestException as e:
         logger.error(f"Erro na comunicação com a API: {str(e)}")
         return jsonify({
@@ -191,22 +285,24 @@ def cotar():
 # ========== COTAÇÕES SELECIONADAS ==========
 @app.route("/selecionadas", methods=["POST", "GET"])
 def selecionadas():
-    global cotações_selecionadas
-   
     if request.method == "POST":
         try:
             dados_cotacao = request.get_json()
             if not dados_cotacao or "transportadora" not in dados_cotacao or "total" not in dados_cotacao or "prazo" not in dados_cotacao:
                 return jsonify({"status": "erro", "mensagem": "Dados da cotação inválidos"}), 400
+                
             dados_cotacao["id"] = str(uuid.uuid4())
             dados_cotacao["timestamp"] = datetime.now().isoformat()
-            cotações_selecionadas.append(dados_cotacao)
+            
+            storage.append('cotações_selecionadas', dados_cotacao)
             logger.info(f"Cotação selecionada: {dados_cotacao['transportadora']}")
+            
             return jsonify({
                 "status": "sucesso",
                 "mensagem": "Cotação selecionada com sucesso",
-                "total_selecionadas": len(cotações_selecionadas)
+                "total_selecionadas": len(storage.get('cotações_selecionadas', []))
             })
+            
         except Exception as e:
             logger.error(f"Erro ao processar cotação selecionada: {str(e)}")
             return jsonify({
@@ -215,26 +311,27 @@ def selecionadas():
             }), 500
            
     elif request.method == "GET":
+        cotações = storage.get('cotações_selecionadas', [])
         return jsonify({
             "status": "sucesso",
-            "cotações_selecionadas": cotações_selecionadas,
-            "total": len(cotações_selecionadas)
+            "cotações_selecionadas": cotações,
+            "total": len(cotações)
         })
 
 @app.route("/selecionadas/<cotacao_id>", methods=["DELETE"])
 def remover_cotacao(cotacao_id):
-    global cotações_selecionadas
-    cotações_selecionadas = [c for c in cotações_selecionadas if c.get('id') != cotacao_id]
+    storage.remove('cotações_selecionadas', cotacao_id)
+    cotações = storage.get('cotações_selecionadas', [])
+    
     return jsonify({
         "status": "sucesso",
         "mensagem": "Cotação removida com sucesso",
-        "total_selecionadas": len(cotações_selecionadas)
+        "total_selecionadas": len(cotações)
     })
 
 @app.route("/selecionadas/limpar", methods=["POST"])
 def limpar_selecionadas():
-    global cotações_selecionadas
-    cotações_selecionadas = []
+    storage.clear('cotações_selecionadas')
     return jsonify({
         "status": "sucesso",
         "mensagem": "Cotações selecionadas foram limpas"
@@ -243,8 +340,6 @@ def limpar_selecionadas():
 # ========== SOLICITAÇÃO DE COLETA ==========
 @app.route("/solicitar-coleta", methods=["POST"])
 def solicitar_coleta():
-    global solicitacoes_coleta
-   
     try:
         if 'xml_file' not in request.files:
             return jsonify({"status": "erro", "mensagem": "Nenhum arquivo enviado"}), 400
@@ -276,7 +371,8 @@ def solicitar_coleta():
         cotacao_id = request.form.get('cotacao_id')
         observacoes = request.form.get('observacoes', '')
        
-        cotacao = next((c for c in cotações_selecionadas if c.get('id') == cotacao_id), None)
+        cotações = storage.get('cotações_selecionadas', [])
+        cotacao = next((c for c in cotações if c.get('id') == cotacao_id), None)
        
         if not cotacao:
             return jsonify({"status": "erro", "mensagem": "Cotação não encontrada"}), 404
@@ -293,7 +389,7 @@ def solicitar_coleta():
             "timestamp": datetime.now().isoformat()
         }
        
-        solicitacoes_coleta.append(solicitacao)
+        storage.append('solicitacoes_coleta', solicitacao)
        
         return jsonify({
             "status": "sucesso",
@@ -310,14 +406,16 @@ def solicitar_coleta():
 
 @app.route("/relatorios/<solicitacao_id>/xml")
 def visualizar_xml(solicitacao_id):
-    solicitacao = next((s for s in solicitacoes_coleta if s.get('id') == solicitacao_id), None)
+    solicitacoes = storage.get('solicitacoes_coleta', [])
+    solicitacao = next((s for s in solicitacoes if s.get('id') == solicitacao_id), None)
     if not solicitacao:
         return "Solicitação não encontrada", 404
     return f"<pre>{solicitacao['xml_content']}</pre>"
 
 @app.route("/relatorios/<solicitacao_id>/download")
 def download_xml(solicitacao_id):
-    solicitacao = next((s for s in solicitacoes_coleta if s.get('id') == solicitacao_id), None)
+    solicitacoes = storage.get('solicitacoes_coleta', [])
+    solicitacao = next((s for s in solicitacoes if s.get('id') == solicitacao_id), None)
     if not solicitacao:
         return "Solicitação não encontrada", 404
    
@@ -378,10 +476,12 @@ def processar_cotacao_massa(row):
             "valor": str(row["valor"])
         }]
     }
+
     headers = {
         "Authorization": TOKEN_API,
         "Content-Type": "application/json"
     }
+
     try:
         if progresso.controle_requisicoes[0] >= 15:
             tempo_passado = time.time() - progresso.controle_requisicoes[1]
@@ -389,20 +489,22 @@ def processar_cotacao_massa(row):
                 time.sleep(10 - tempo_passado)
             progresso.controle_requisicoes[0] = 0
             progresso.controle_requisicoes[1] = time.time()
+
         response = requests.post(URL_API, headers=headers, json=payload, timeout=30)
         progresso.controle_requisicoes[0] += 1
-        response.raise_for_status()
-        data = response.json()
-        if isinstance(data, dict) and not data.get("erro") and "resultado" in data:
-            if data["resultado"]:
-                mais_barata = min(data["resultado"], key=lambda x: float(x["total"]))
-                return {
-                    "status": "sucesso",
-                    "mais_barata": mais_barata,
-                    "todas_opcoes": data["resultado"]
-                }
+
+        if response.status_code == 200:
+            data = response.json()
+            if isinstance(data, dict) and not data.get("erro") and "resultado" in data:
+                if data["resultado"]:
+                    mais_barata = min(data["resultado"], key=lambda x: float(x["total"]))
+                    return {
+                        "status": "sucesso",
+                        "mais_barata": mais_barata,
+                        "todas_opcoes": data["resultado"]
+                    }
         return {"status": "sem_resultado", "mensagem": data.get("mensagem", "Nenhuma cotação disponível")}
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         return {"status": "erro", "mensagem": str(e)}
 
 def processar_arquivo_background(filepath):
@@ -457,7 +559,7 @@ def processar_arquivo_background(filepath):
             df_resultado = pd.DataFrame(resultados)
            
             if progresso.tipo_retorno == 'mais_barata':
-                df_final = df_resultado.drop(columns=['todas_opcoes'] if 'todas_opcoes' in df_resultado.columns else [])
+                df_final = df_resultado
             else:
                 df_final = df_resultado
            
@@ -497,8 +599,10 @@ def upload():
     if file.filename == '':
         return jsonify({"erro": "Nenhum arquivo selecionado"}), 400
    
-    if not allowed_file(file.filename):
-        return jsonify({"erro": "Tipo de arquivo não permitido"}), 400
+    # Validação melhorada do arquivo
+    is_valid, message = validate_excel_file(file)
+    if not is_valid:
+        return jsonify({"erro": message}), 400
    
     tipo_retorno = request.form.get('tipo_retorno', 'mais_barata')
     progresso.tipo_retorno = tipo_retorno
@@ -535,6 +639,7 @@ def obter_progresso():
         "atual": progresso.atual,
         "total": progresso.total
     }
+
     if progresso.erro:
         response_data.update({
             "erro": progresso.erro,
@@ -583,4 +688,5 @@ atexit.register(cleanup)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    debug_mode = os.environ.get('FLASK_ENV') == 'development'
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
