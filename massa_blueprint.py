@@ -456,6 +456,7 @@ def upload():
     return jsonify({"mensagem": "Processamento iniciado"})
 
 @massa_bp.get("/progresso", endpoint="progresso")
+@massa_bp.get("/obter_progresso", endpoint="obter_progresso")  # alias p/ templates antigos
 def obter_progresso():
     if progresso.thread is not None and not progresso.thread.is_alive():
         progresso.processando = False
