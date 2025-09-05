@@ -12,3 +12,4 @@ idna==3.10
 urllib3==2.2.3
 pandas
 openpyxl
+gunicorn>=22.0
