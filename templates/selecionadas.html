@@ -1,374 +1,312 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Promov Logística - Cotações Selecionadas</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
-    <style>
-        body { background-color: #f4f6f9; overflow-x: hidden; }
-        .sidebar {
-            background-color: #003366;
-            color: white;
-            min-height: 100vh;
-            width: 220px;
-            position: fixed;
-        }
-        .sidebar-brand {
-            padding: 15px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-        .sidebar-brand img {
-            max-width: 150px;
-        }
-        .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 10px 15px;
-            margin: 2px 0;
-        }
-        .nav-link:hover, .nav-link.active {
-            color: white;
-            background-color: rgba(255,255,255,0.1);
-        }
-        .main-content {
-            margin-left: 220px;
-            padding: 30px;
-        }
-        .valor-frete { font-size: 1.2rem; font-weight: bold; color: #FF6B00; }
-        .transportadora-logo {
-            max-height: 50px;
-            max-width: 100px;
-            object-fit: contain;
-        }
-        .card-cotacao { 
-            border-left: 4px solid #003366; 
-            transition: all 0.3s ease;
-            margin-bottom: 15px;
-        }
-        .card-cotacao:hover { 
-            transform: translateY(-3px); 
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1); 
-        }
-        .badge-prazo { background-color: #17a2b8; }
-        .badge-servico { background-color: #6c757d; }
-        .data-cotacao { font-size: 0.85rem; color: #6c757d; }
-        .resumo-card { background-color: #e9ecef; }
-        .btn-limpar { margin-top: 20px; }
-        .btn-coleta { margin-top: 10px; }
-        @media (max-width: 768px) {
-            .sidebar { width: 100%; position: relative; }
-            .main-content { margin-left: 0; }
-        }
-        .modal-xl { max-width: 800px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Promov Logística - Cotações Selecionadas</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f4f6f9; overflow-x: hidden; }
+    .sidebar { background-color: #003366; color: white; min-height: 100vh; width: 220px; position: fixed; }
+    .sidebar-brand { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; }
+    .sidebar-brand img { max-width: 150px; }
+    .nav-link { color: rgba(255,255,255,0.8); padding: 10px 15px; margin: 2px 0; }
+    .nav-link:hover, .nav-link.active { color: white; background-color: rgba(255,255,255,0.1); }
+    .main-content { margin-left: 220px; padding: 30px; }
+
+    .cotacoes-lista { gap: 12px; }
+    .cotacao-item {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .cotacao-item:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,0.08); }
+    .cotacao-esq { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .transportadora-logo { height: 48px; width: 96px; object-fit: contain; }
+    .cotacao-nomes { min-width: 0; }
+    .cotacao-nomes h5 { margin: 0; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cotacao-nomes small { color: #6c757d; }
+    .cotacao-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .badge-prazo { background-color: #17a2b8; }
+    .badge-servico { background-color: #6c757d; }
+    .valor-frete {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #FF6B00;
+      white-space: nowrap;
+    }
+    .data-cotacao { font-size: 0.85rem; color: #6c757d; }
+    .cotacao-dir { display: flex; align-items: center; gap: 16px; }
+    .acoes { display: flex; gap: 8px; }
+    .alert-observacao { margin: 0; padding: 6px 10px; }
+    .resumo-card { background-color: #e9ecef; }
+    .btn-limpar { margin-top: 20px; }
+
+    @media (max-width: 992px) {
+      .cotacao-item { flex-direction: column; align-items: stretch; gap: 12px; }
+      .cotacao-dir { justify-content: space-between; }
+    }
+    @media (max-width: 768px) {
+      .sidebar { width: 100%; position: relative; }
+      .main-content { margin-left: 0; }
+    }
+
+    .modal-xl { max-width: 800px; }
+  </style>
 </head>
 <body>
-    <div class="d-flex">
-        <div class="sidebar">
-            <div class="sidebar-brand">
-                <img src="/static/img/logo-promov-branco.png" alt="Promov Logística Logo">
-            </div>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link" href="/"><i class="bi bi-house-door"></i> Início</a></li>
-                <li class="nav-item"><a class="nav-link" href="/cotacoes"><i class="bi bi-calculator"></i> Cotação</a></li>
-                <li class="nav-item"><a class="nav-link" href="/massa"><i class="bi bi-collection"></i> Cotação em Massa</a></li>
-                <li class="nav-item"><a class="nav-link" href="/relatorios"><i class="bi bi-file-earmark-text"></i> Relatórios</a></li>
-                <li class="nav-item"><a class="nav-link active" href="/selecionadas"><i class="bi bi-check-circle"></i> Selecionadas</a></li>
-                <li class="nav-item mt-auto"><a class="nav-link text-danger" href="/auth/logout"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
-            </ul>
-        </div>
+  <div class="d-flex">
+    <div class="sidebar">
+      <div class="sidebar-brand">
+        <img src="{{ url_for('static', filename='img/logo-promov-branco.png') }}" alt="Promov Logística Logo">
+      </div>
+      <ul class="nav flex-column">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('home') }}"><i class="bi bi-house-door"></i> Início</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('home') }}"><i class="bi bi-calculator"></i> Cotação</a></li>
 
-        <div class="main-content container-fluid">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="bi bi-check-circle"></i> Cotações Selecionadas</h2>
-                <div>
-                    <span class="badge bg-primary fs-6">{{ cotações|length }} cotações</span>
-                </div>
-            </div>
+        <!-- ✅ Use a rota Flask robusta para Cotação em Massa -->
+        <li class="nav-item">
+          <a class="nav-link" href="{{ massa_url() }}">
+            <i class="bi bi-collection"></i> Cotação em Massa
+          </a>
+        </li>
 
-            {% if cotações %}
-            <div class="resumo-card card mb-4 shadow">
-                <div class="card-body">
-                    <h5 class="card-title">Resumo das Cotações</h5>
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="d-flex align-items-center">
-                                <i class="bi bi-currency-dollar fs-1 text-success me-3"></i>
-                                <div>
-                                    <small>Valor Total</small>
-                                    <h4>R$ {{ "%.2f"|format(cotações|sum(attribute='total')|float) }}</h4>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="d-flex align-items-center">
-                                <i class="bi bi-clock fs-1 text-info me-3"></i>
-                                <div>
-                                    <small>Prazo Médio</small>
-                                    <h4>
-                                        {% set prazos = cotações|map(attribute='prazo')|map('extract_number')|list %}
-                                        {% if prazos %}
-                                            {{ (prazos|sum / prazos|length)|round(1) }} dias
-                                        {% else %}
-                                            N/A
-                                        {% endif %}
-                                    </h4>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="d-flex align-items-center">
-                                <i class="bi bi-truck fs-1 text-primary me-3"></i>
-                                <div>
-                                    <small>Transportadoras</small>
-                                    <h4>{{ cotações|map(attribute='transportadora')|unique|list|length }}</h4>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row">
-                {% for cotacao in cotações %}
-                <div class="col-lg-6 col-xl-4 mb-4">
-                    <div class="card card-cotacao h-100 shadow-sm">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div class="d-flex align-items-center">
-                                    {% if cotacao.imagem %}
-                                    <img src="{{ cotacao.imagem }}" class="transportadora-logo me-3" alt="Logo {{ cotacao.transportadora }}">
-                                    {% endif %}
-                                    <div>
-                                        <h5 class="card-title mb-0">{{ cotacao.transportadora }}</h5>
-                                        <small class="text-muted">{{ cotacao.integrador }}</small>
-                                    </div>
-                                </div>
-                                <span class="valor-frete">R$ {{ "%.2f"|format(cotacao.total|float) }}</span>
-                            </div>
-
-                            <div class="row mb-3">
-                                <div class="col-6">
-                                    <small class="text-muted">Prazo</small>
-                                    <div class="badge badge-prazo bg-info text-white p-2">
-                                        <i class="bi bi-clock"></i> {{ cotacao.prazo }}
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted">Serviço</small>
-                                    <div class="badge badge-servico bg-secondary p-2">
-                                        {{ cotacao.servico }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {% if cotacao.observacao %}
-                            <div class="alert alert-warning p-2 mb-3">
-                                <small><i class="bi bi-info-circle"></i> {{ cotacao.observacao }}</small>
-                            </div>
-                            {% endif %}
-
-                            <div class="data-cotacao mb-3">
-                                <i class="bi bi-calendar"></i> 
-                                {{ cotacao.timestamp|format_date }}
-                            </div>
-
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-danger btn-sm" onclick="removerCotacao('{{ cotacao.id }}')">
-                                    <i class="bi bi-trash"></i> Remover
-                                </button>
-                                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalColeta{{ cotacao.id }}">
-                                    <i class="bi bi-truck"></i> Solicitar Coleta
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Modal para Solicitar Coleta -->
-                    <div class="modal fade" id="modalColeta{{ cotacao.id }}" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-xl">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Solicitar Coleta - {{ cotacao.transportadora }}</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <form id="formColeta{{ cotacao.id }}" enctype="multipart/form-data">
-                                        <input type="hidden" name="cotacao_id" value="{{ cotacao.id }}">
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label">Anexar XML da Nota Fiscal</label>
-                                            <input type="file" class="form-control" name="xml_file" accept=".xml" required>
-                                            <div class="form-text">Selecione o arquivo XML da nota fiscal</div>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label">Observações</label>
-                                            <textarea class="form-control" name="observacoes" rows="3" placeholder="Informações adicionais para a coleta..."></textarea>
-                                        </div>
-                                    </form>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                    <button type="button" class="btn btn-primary" onclick="solicitarColeta('{{ cotacao.id }}')">
-                                        <i class="bi bi-send"></i> Enviar Solicitação
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            <div class="text-center btn-limpar">
-                <button class="btn btn-danger" onclick="limparCotações()">
-                    <i class="bi bi-trash"></i> Limpar Todas as Cotações
-                </button>
-            </div>
-
-            {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-inbox display-1 text-muted"></i>
-                <h3 class="text-muted mt-3">Nenhuma cotação selecionada</h3>
-                <p class="text-muted">As cotações que você selecionar aparecerão aqui.</p>
-                <a href="/" class="btn btn-primary">
-                    <i class="bi bi-calculator"></i> Fazer uma Cotação
-                </a>
-            </div>
-            {% endif %}
-        </div>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('relatorios') }}"><i class="bi bi-file-earmark-text"></i> Relatórios</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{{ url_for('selecionadas') }}"><i class="bi bi-check-circle"></i> Selecionadas</a></li>
+        <li class="nav-item mt-auto"><a class="nav-link text-danger" href="#"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
+      </ul>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>
-        // Função para remover uma cotação específica
-        function removerCotacao(cotacaoId) {
-            Swal.fire({
-                title: 'Tem certeza?',
-                text: "Esta cotação será removida da lista!",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Sim, remover!',
-                cancelButtonText: 'Cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    fetch(`/selecionadas/${cotacaoId}`, {
-                        method: 'DELETE'
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'sucesso') {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Removida!',
-                                text: 'Cotação removida com sucesso.',
-                                confirmButtonColor: '#003366'
-                            }).then(() => {
-                                location.reload();
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro',
-                            text: 'Não foi possível remover a cotação.',
-                            confirmButtonColor: '#003366'
-                        });
-                    });
-                }
-            });
-        }
+    <div class="main-content container-fluid">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-check-circle"></i> Cotações Selecionadas</h2>
+        <div>
+          <span class="badge bg-primary fs-6">{{ cotacoes|length }} cotações</span>
+        </div>
+      </div>
 
-        // Função para solicitar coleta
-        function solicitarColeta(cotacaoId) {
-            const formData = new FormData(document.getElementById(`formColeta${cotacaoId}`));
-            
-            fetch('/solicitar-coleta', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'sucesso') {
-                    // Fechar o modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById(`modalColeta${cotacaoId}`));
-                    modal.hide();
-                    
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Sucesso!',
-                        text: data.mensagem,
-                        confirmButtonColor: '#003366'
-                    }).then(() => {
-                        // Redirecionar para relatórios
-                        window.location.href = '/relatorios';
-                    });
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro',
-                        text: data.mensagem,
-                        confirmButtonColor: '#003366'
-                    });
-                }
-            })
-            .catch(error => {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: 'Não foi possível processar a solicitação.',
-                    confirmButtonColor: '#003366'
-                });
-            });
-        }
+      {% if cotacoes %}
+      <div class="resumo-card card mb-4 shadow">
+        <div class="card-body">
+          <h5 class="card-title">Resumo das Cotações</h5>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-currency-dollar fs-1 text-success me-3"></i>
+                <div>
+                  <small>Valor Total</small>
+                  <h4>
+                    R$
+                    {{ "%.2f"|format((cotacoes|sum(attribute='total'))|float) }}
+                  </h4>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-clock fs-1 text-info me-3"></i>
+                <div>
+                  <small>Prazo Médio</small>
+                  <h4>
+                    {% set prazos = cotacoes|map(attribute='prazo')|map('extract_number')|list %}
+                    {% if prazos %}
+                      {{ (prazos|sum / prazos|length)|round(1) }} dias
+                    {% else %}
+                      N/A
+                    {% endif %}
+                  </h4>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-truck fs-1 text-primary me-3"></i>
+                <div>
+                  <small>Transportadoras</small>
+                  <h4>{{ cotacoes|map(attribute='transportadora')|unique|list|length }}</h4>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        // Função para limpar todas as cotações
-        function limparCotações() {
-            Swal.fire({
-                title: 'Tem certeza?',
-                text: "Todas as cotações selecionadas serão removidas!",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Sim, limpar tudo!',
-                cancelButtonText: 'Cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    fetch('/selecionadas/limpar', {
-                        method: 'POST'
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'sucesso') {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Limpo!',
-                                text: 'Todas as cotações foram removidas.',
-                                confirmButtonColor: '#003366'
-                            }).then(() => {
-                                location.reload();
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro',
-                            text: 'Não foi possível limpar as cotações.',
-                            confirmButtonColor: '#003366'
-                        });
-                    });
-                }
-            });
+      <div class="cotacoes-lista d-flex flex-column">
+        {% for cotacao in cotacoes %}
+        <div class="cotacao-item">
+          <div class="cotacao-esq">
+            {% if cotacao.imagem %}
+              <img src="{{ cotacao.imagem }}" class="transportadora-logo" alt="Logo {{ cotacao.transportadora }}">
+            {% endif %}
+            <div class="cotacao-nomes">
+              <h5 class="card-title mb-1">{{ cotacao.transportadora }}</h5>
+              <small class="text-muted">{{ cotacao.integrador }}</small>
+              <div class="cotacao-meta mt-2">
+                <span class="badge badge-prazo text-white p-2">
+                  <i class="bi bi-clock"></i> {{ cotacao.prazo }}
+                </span>
+                <span class="badge badge-servico text-white p-2">
+                  {{ cotacao.servico }}
+                </span>
+                <span class="data-cotacao"><i class="bi bi-calendar ms-1 me-1"></i>{{ cotacao.timestamp|format_date }}</span>
+              </div>
+
+              {% if cotacao.observacao %}
+              <div class="alert alert-warning alert-observacao mt-2">
+                <small><i class="bi bi-info-circle"></i> {{ cotacao.observacao }}</small>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="cotacao-dir">
+            <span class="valor-frete">R$ {{ "%.2f"|format((cotacao.total or 0)|float) }}</span>
+            <div class="acoes">
+              <button class="btn btn-danger btn-sm" onclick="removerCotacao('{{ cotacao.id }}')">
+                <i class="bi bi-trash"></i> Remover
+              </button>
+              <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalColeta{{ cotacao.id }}">
+                <i class="bi bi-truck"></i> Solicitar Coleta
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal para Solicitar Coleta -->
+        <div class="modal fade" id="modalColeta{{ cotacao.id }}" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Solicitar Coleta - {{ cotacao.transportadora }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <form id="formColeta{{ cotacao.id }}" enctype="multipart/form-data">
+                  <input type="hidden" name="cotacao_id" value="{{ cotacao.id }}">
+                  <div class="mb-3">
+                    <label class="form-label">Anexar XML da Nota Fiscal</label>
+                    <input type="file" class="form-control" name="xml_file" accept=".xml" required>
+                    <div class="form-text">Selecione o arquivo XML da nota fiscal</div>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Observações</label>
+                    <textarea class="form-control" name="observacoes" rows="3" placeholder="Informações adicionais para a coleta..."></textarea>
+                  </div>
+                </form>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="solicitarColeta('{{ cotacao.id }}')">
+                  <i class="bi bi-send"></i> Enviar Solicitação
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="text-center btn-limpar">
+        <button class="btn btn-danger" onclick="limparCotacoes()">
+          <i class="bi bi-trash"></i> Limpar Todas as Cotações
+        </button>
+      </div>
+
+      {% else %}
+      <div class="text-center py-5">
+        <i class="bi bi-inbox display-1 text-muted"></i>
+        <h3 class="text-muted mt-3">Nenhuma cotação selecionada</h3>
+        <p class="text-muted">As cotações que você selecionar aparecerão aqui.</p>
+        <a href="{{ url_for('home') }}" class="btn btn-primary">
+          <i class="bi bi-calculator"></i> Fazer uma Cotação
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script>
+    function removerCotacao(cotacaoId) {
+      Swal.fire({
+        title: 'Tem certeza?',
+        text: "Esta cotação será removida da lista!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sim, remover!',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          fetch('{{ url_for("remover_cotacao", cotacao_id="__ID__") }}'.replace('__ID__', cotacaoId), { method: 'DELETE' })
+          .then(r => r.json())
+          .then(data => {
+            if (data.status === 'sucesso') {
+              Swal.fire({ icon: 'success', title: 'Removida!', text: 'Cotação removida com sucesso.', confirmButtonColor: '#003366' })
+                .then(() => location.reload());
+            } else {
+              Swal.fire({ icon: 'error', title: 'Erro', text: data.mensagem || 'Falha ao remover.', confirmButtonColor: '#003366' });
+            }
+          })
+          .catch(() => Swal.fire({ icon: 'error', title: 'Erro', text: 'Não foi possível remover a cotação.', confirmButtonColor: '#003366' }));
         }
-    </script>
+      });
+    }
+
+    function solicitarColeta(cotacaoId) {
+      const formData = new FormData(document.getElementById(`formColeta${cotacaoId}`));
+      fetch('{{ url_for("solicitar_coleta") }}', { method: 'POST', body: formData })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'sucesso') {
+          const modalEl = document.getElementById(`modalColeta${cotacaoId}`);
+          const modal = bootstrap.Modal.getInstance(modalEl);
+          if (modal) modal.hide();
+          Swal.fire({ icon: 'success', title: 'Sucesso!', text: data.mensagem, confirmButtonColor: '#003366' })
+            .then(() => { window.location.href = '{{ url_for("relatorios") }}'; });
+        } else {
+          Swal.fire({ icon: 'error', title: 'Erro', text: data.mensagem || 'Falha ao solicitar coleta.', confirmButtonColor: '#003366' });
+        }
+      })
+      .catch(() => Swal.fire({ icon: 'error', title: 'Erro', text: 'Não foi possível processar a solicitação.', confirmButtonColor: '#003366' }));
+    }
+
+    function limparCotacoes() {
+      Swal.fire({
+        title: 'Tem certeza?',
+        text: "Todas as cotações selecionadas serão removidas!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sim, limpar tudo!',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          fetch('{{ url_for("limpar_selecionadas") }}', { method: 'POST' })
+          .then(r => r.json())
+          .then(data => {
+            if (data.status === 'sucesso') {
+              Swal.fire({ icon: 'success', title: 'Limpo!', text: 'Todas as cotações foram removidas.', confirmButtonColor: '#003366' })
+                .then(() => location.reload());
+            } else {
+              Swal.fire({ icon: 'error', title: 'Erro', text: data.mensagem || 'Falha ao limpar.', confirmButtonColor: '#003366' });
+            }
+          })
+          .catch(() => Swal.fire({ icon: 'error', title: 'Erro', text: 'Não foi possível limpar as cotações.', confirmButtonColor: '#003366' }));
+        }
+      });
+    }
+  </script>
 </body>
 </html>
+
