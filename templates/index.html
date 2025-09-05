@@ -1,494 +1,420 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Promov Logística - Cotação Profissional</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
-    <style>
-        body { background-color: #f4f6f9; overflow-x: hidden; }
-        .sidebar {
-            background-color: #003366;
-            color: white;
-            min-height: 100vh;
-            width: 220px;
-            position: fixed;
-        }
-        .sidebar-brand {
-            padding: 15px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-        .sidebar-brand img {
-            max-width: 150px;
-        }
-        .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 10px 15px;
-            margin: 2px 0;
-        }
-        .nav-link:hover, .nav-link.active {
-            color: white;
-            background-color: rgba(255,255,255,0.1);
-        }
-        .main-content {
-            margin-left: 220px;
-            padding: 30px;
-        }
-        .valor-frete { font-size: 1.2rem; font-weight: bold; color: #FF6B00; }
-        .transportadora-logo {
-            max-height: 50px;
-            max-width: 100px;
-            object-fit: contain;
-        }
-        .loading {
-            display: none;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        .spinner-border {
-            width: 3rem;
-            height: 3rem;
-        }
-        .form-container { background-color: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .result-row { margin-bottom: 15px; border-radius: 5px; padding: 15px; background: white; }
-        .result-row:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .best-option { border-left: 5px solid #28a745; background-color: #f8fff8; }
-        .info-badge { font-size: 0.9rem; }
-        .dimension-badge { background-color: #6c757d; }
-        .summary-card { background-color: #e9ecef; }
-        .form-section { margin-bottom: 20px; }
-        .pacote-container { background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px; position: relative; }
-        .remover-pacote { position: absolute; top: 5px; right: 5px; cursor: pointer; }
-        @media (max-width: 768px) {
-            .sidebar { width: 100%; position: relative; }
-            .main-content { margin-left: 0; }
-            .form-container { padding: 15px; }
-            .result-row { padding: 10px; }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Promov Logística - Cotação Profissional</title>
+
+  <!-- Bootstrap & Icons (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css"/>
+
+  <style>
+    body { background-color: #f4f6f9; overflow-x: hidden; }
+    .sidebar { background-color: #003366; color: white; min-height: 100vh; width: 220px; position: fixed; }
+    .sidebar-brand { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; }
+    .sidebar-brand img { max-width: 150px; }
+    .nav-link { color: rgba(255,255,255,0.8); padding: 10px 15px; margin: 2px 0; }
+    .nav-link:hover, .nav-link.active { color: white; background-color: rgba(255,255,255,0.1); }
+    .main-content { margin-left: 220px; padding: 30px; }
+    .valor-frete { font-size: 1.2rem; font-weight: bold; color: #FF6B00; }
+    .transportadora-logo { max-height: 50px; max-width: 100px; object-fit: contain; }
+    .loading { display: none; justify-content: center; align-items: center; padding: 20px; }
+    .spinner-border { width: 3rem; height: 3rem; }
+    .form-container { background-color: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .result-row { margin-bottom: 15px; border-radius: 5px; padding: 15px; background: white; }
+    .result-row:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    .best-option { border-left: 5px solid #28a745; background-color: #f8fff8; }
+    .info-badge { font-size: 0.9rem; }
+    .dimension-badge { background-color: #6c757d; }
+    .summary-card { background-color: #e9ecef; }
+    .form-section { margin-bottom: 20px; }
+    .pacote-container { background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px; position: relative; }
+    .remover-pacote { position: absolute; top: 5px; right: 5px; cursor: pointer; }
+    @media (max-width: 768px) {
+      .sidebar { width: 100%; position: relative; }
+      .main-content { margin-left: 0; }
+      .form-container { padding: 15px; }
+      .result-row { padding: 10px; }
+    }
+  </style>
 </head>
 <body>
-    <div class="d-flex">
-        <div class="sidebar">
-            <div class="sidebar-brand">
-                <img src="/static/img/logo-promov-branco.png" alt="Promov Logística Logo">
-            </div>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link" href="/"><i class="bi bi-house-door"></i> Início</a></li>
-                <li class="nav-item"><a class="nav-link active" href="/cotacoes"><i class="bi bi-calculator"></i> Cotação</a></li>
-                <li class="nav-item"><a class="nav-link" href="/massa"><i class="bi bi-collection"></i> Cotação em Massa</a></li>
-                <li class="nav-item"><a class="nav-link" href="/relatorio"><i class="bi bi-file-earmark-text"></i> Relatórios</a></li>
-                <li class="nav-item"><a class="nav-link" href="/selecionadas"><i class="bi bi-check-circle"></i> Selecionadas</a></li>
-                <li class="nav-item mt-auto"><a class="nav-link text-danger" href="/auth/logout"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
-            </ul>
-        </div>
-
-        <div class="main-content container-fluid">
-            <h2 class="mb-4">Cotação de Frete</h2>
-
-            <div class="form-container card mb-4 shadow">
-                <div class="card-header bg-primary text-white">Dados da Cotação</div>
-                <div class="card-body">
-                    <form id="cotacaoForm">
-                        <div class="form-section">
-                            <h5><i class="bi bi-truck"></i> Dados de Origem e Destino</h5>
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="cnpj_origem" class="form-label">CNPJ/CPF Origem</label>
-                                        <input type="text" class="form-control" id="cnpj_origem" name="cnpj_origem" placeholder="00.000.000/0000-00" required value="12345678000195">
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="cep_origem" class="form-label">CEP Origem</label>
-                                        <input type="text" class="form-control" id="cep_origem" name="cep_origem" placeholder="00000-000" required value="88502000">
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="cnpj_destino" class="form-label">CNPJ/CPF Destino</label>
-                                        <input type="text" class="form-control" id="cnpj_destino" name="cnpj_destino" placeholder="00.000.000/0000-00" required value="98765432000198">
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="cep_destino" class="form-label">CEP Destino</label>
-                                        <input type="text" class="form-control" id="cep_destino" name="cep_destino" placeholder="00000-000" required value="01001000">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-section">
-                            <h5><i class="bi bi-box-seam"></i> Dados da Carga</h5>
-                            <div id="pacotes-container">
-                                <div class="pacote-container" id="pacote-0">
-                                    <div class="row g-3">
-                                        <div class="col-md-3">
-                                            <div class="mb-3">
-                                                <label for="quantidade_0" class="form-label">Quantidade</label>
-                                                <input type="number" class="form-control" name="quantidade_0" id="quantidade_0" value="1" min="1" required>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="mb-3">
-                                                <label for="peso_0" class="form-label">Peso (kg)</label>
-                                                <input type="number" step="0.01" class="form-control" name="peso_0" id="peso_0" value="1" min="0.01" required>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <div class="mb-3">
-                                                <label for="altura_0" class="form-label">Altura (m)</label>
-                                                <input type="number" step="0.01" class="form-control" name="altura_0" id="altura_0" value="0.1" min="0.01" required>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <div class="mb-3">
-                                                <label for="largura_0" class="form-label">Largura (m)</label>
-                                                <input type="number" step="0.01" class="form-control" name="largura_0" id="largura_0" value="0.1" min="0.01" required>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <div class="mb-3">
-                                                <label for="comprimento_0" class="form-label">Profundidade (m)</label>
-                                                <input type="number" step="0.01" class="form-control" name="comprimento_0" id="comprimento_0" value="0.1" min="0.01" required>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label for="valor_unitario_0" class="form-label">Valor Unitário (R$)</label>
-                                                <input type="number" step="0.01" class="form-control" name="valor_unitario_0" id="valor_unitario_0" value="100" min="0.01" required>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="button" id="adicionar-pacote" class="btn btn-secondary">
-                                <i class="bi bi-plus-circle"></i> Adicionar Pacote
-                            </button>
-                        </div>
-                        
-                        <div class="d-grid gap-2 mt-3">
-                            <button type="submit" class="btn btn-success btn-lg">
-                                <i class="bi bi-play"></i> Cotar
-                            </button>
-                            <button type="button" id="limpar-cotacao" class="btn btn-outline-danger">
-                                <i class="bi bi-trash"></i> Limpar Cotação
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            
-            <div id="loading" class="loading">
-                <div class="spinner-border text-primary"></div>
-            </div>
-            
-            <div id="resumoCarga" class="mt-4" style="display: none;">
-                <div class="card summary-card mb-3 shadow">
-                    <div class="card-body">
-                        <h5 class="card-title">Resumo da Carga</h5>
-                        <div class="d-flex flex-wrap gap-2">
-                            <span class="badge bg-primary info-badge" id="resumoQuantidade"></span>
-                            <span class="badge bg-primary info-badge" id="resumoPeso"></span>
-                            <span class="badge bg-success info-badge" id="resumoValor"></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="resultados" class="mt-3"></div>
-        </div>
+  <div class="d-flex">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-brand">
+        <img src="{{ url_for('static', filename='img/logo-promov-branco.png') }}" alt="Promov Logística Logo">
+      </div>
+      <ul class="nav flex-column">
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('home') }}">
+            <i class="bi bi-house-door"></i> Início
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="{{ url_for('home') }}">
+            <i class="bi bi-calculator"></i> Cotação
+          </a>
+        </li>
+        <li class="nav-item">
+          <!-- AJUSTE AQUI: rota robusta para Cotação em Massa -->
+          <a class="nav-link" href="{{ massa_url() }}">
+            <i class="bi bi-collection"></i> Cotação em Massa
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('relatorios') }}">
+            <i class="bi bi-file-earmark-text"></i> Relatórios
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('selecionadas') }}">
+            <i class="bi bi-check-circle"></i> Selecionadas
+          </a>
+        </li>
+        <li class="nav-item mt-auto">
+          <a class="nav-link text-danger" href="#"><i class="bi bi-box-arrow-right"></i> Sair</a>
+        </li>
+      </ul>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>
-        let pacoteCount = 1;
-        let opcoesCotas = []; // Armazenar cotações globalmente
-        
-        // Adicionar novo pacote
-        document.getElementById('adicionar-pacote').addEventListener('click', function() {
-            const container = document.getElementById('pacotes-container');
-            const newPacote = document.createElement('div');
-            newPacote.className = 'pacote-container';
-            newPacote.id = `pacote-${pacoteCount}`;
-            newPacote.innerHTML = `
-                <button type="button" class="btn btn-sm btn-danger remover-pacote" onclick="removerPacote(${pacoteCount})">
-                    <i class="bi bi-x"></i>
-                </button>
-                <div class="row g-3">
+    <!-- CONTEÚDO -->
+    <div class="main-content container-fluid">
+      <h2 class="mb-4">Cotação de Frete</h2>
+
+      <div class="form-container card mb-4 shadow">
+        <div class="card-header bg-primary text-white">Dados da Cotação</div>
+        <div class="card-body">
+          <form id="cotacaoForm">
+            <div class="form-section">
+              <h5><i class="bi bi-truck"></i> Dados de Origem e Destino</h5>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="cnpj_origem" class="form-label">CNPJ/CPF Origem</label>
+                    <input type="text" class="form-control" id="cnpj_origem" name="cnpj_origem" placeholder="00.000.000/0000-00" required value="12345678000195">
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="cep_origem" class="form-label">CEP Origem</label>
+                    <input type="text" class="form-control" id="cep_origem" name="cep_origem" placeholder="00000-000" required value="88502000">
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="cnpj_destino" class="form-label">CNPJ/CPF Destino</label>
+                    <input type="text" class="form-control" id="cnpj_destino" name="cnpj_destino" placeholder="00.000.000/0000-00" required value="98765432000198">
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="cep_destino" class="form-label">CEP Destino</label>
+                    <input type="text" class="form-control" id="cep_destino" name="cep_destino" placeholder="00000-000" required value="01001000">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h5><i class="bi bi-box-seam"></i> Dados da Carga</h5>
+              <div id="pacotes-container">
+                <div class="pacote-container" id="pacote-0">
+                  <div class="row g-3">
                     <div class="col-md-3">
-                        <div class="mb-3">
-                            <label for="quantidade_${pacoteCount}" class="form-label">Quantidade</label>
-                            <input type="number" class="form-control" name="quantidade_${pacoteCount}" id="quantidade_${pacoteCount}" value="1" min="1" required>
-                        </div>
+                      <div class="mb-3">
+                        <label for="quantidade_0" class="form-label">Quantidade</label>
+                        <input type="number" class="form-control" name="quantidade_0" id="quantidade_0" value="1" min="1" required>
+                      </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="mb-3">
-                            <label for="peso_${pacoteCount}" class="form-label">Peso (kg)</label>
-                            <input type="number" step="0.01" class="form-control" name="peso_${pacoteCount}" id="peso_${pacoteCount}" value="1" min="0.01" required>
-                        </div>
+                      <div class="mb-3">
+                        <label for="peso_0" class="form-label">Peso (kg)</label>
+                        <input type="number" step="0.01" class="form-control" name="peso_0" id="peso_0" value="1" min="0.01" required>
+                      </div>
                     </div>
                     <div class="col-md-2">
-                        <div class="mb-3">
-                            <label for="altura_${pacoteCount}" class="form-label">Altura (m)</label>
-                            <input type="number" step="0.01" class="form-control" name="altura_${pacoteCount}" id="altura_${pacoteCount}" value="0.1" min="0.01" required>
-                        </div>
+                      <div class="mb-3">
+                        <label for="altura_0" class="form-label">Altura (m)</label>
+                        <input type="number" step="0.01" class="form-control" name="altura_0" id="altura_0" value="0.1" min="0.01" required>
+                      </div>
                     </div>
                     <div class="col-md-2">
-                        <div class="mb-3">
-                            <label for="largura_${pacoteCount}" class="form-label">Largura (m)</label>
-                            <input type="number" step="0.01" class="form-control" name="largura_${pacoteCount}" id="largura_${pacoteCount}" value="0.1" min="0.01" required>
-                        </div>
+                      <div class="mb-3">
+                        <label for="largura_0" class="form-label">Largura (m)</label>
+                        <input type="number" step="0.01" class="form-control" name="largura_0" id="largura_0" value="0.1" min="0.01" required>
+                      </div>
                     </div>
                     <div class="col-md-2">
-                        <div class="mb-3">
-                            <label for="comprimento_${pacoteCount}" class="form-label">Profundidade (m)</label>
-                            <input type="number" step="0.01" class="form-control" name="comprimento_${pacoteCount}" id="comprimento_${pacoteCount}" value="0.1" min="0.01" required>
-                        </div>
+                      <div class="mb-3">
+                        <label for="comprimento_0" class="form-label">Profundidade (m)</label>
+                        <input type="number" step="0.01" class="form-control" name="comprimento_0" id="comprimento_0" value="0.1" min="0.01" required>
+                      </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="mb-3">
-                            <label for="valor_unitario_${pacoteCount}" class="form-label">Valor Unitário (R$)</label>
-                            <input type="number" step="0.01" class="form-control" name="valor_unitario_${pacoteCount}" id="valor_unitario_${pacoteCount}" value="100" min="0.01" required>
-                        </div>
+                      <div class="mb-3">
+                        <label for="valor_unitario_0" class="form-label">Valor Unitário (R$)</label>
+                        <input type="number" step="0.01" class="form-control" name="valor_unitario_0" id="valor_unitario_0" value="100" min="0.01" required>
+                      </div>
                     </div>
+                  </div>
                 </div>
-            `;
-            container.appendChild(newPacote);
-            pacoteCount++;
-        });
+              </div>
 
-        // Remover pacote
-        window.removerPacote = function(id) {
-            if (document.querySelectorAll('.pacote-container').length > 1) {
-                document.getElementById(`pacote-${id}`).remove();
-            } else {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Atenção',
-                    text: 'É necessário ter pelo menos um pacote',
-                    confirmButtonColor: '#003366'
-                });
-            }
-        };
+              <button type="button" id="adicionar-pacote" class="btn btn-secondary">
+                <i class="bi bi-plus-circle"></i> Adicionar Pacote
+              </button>
+            </div>
 
-        // Limpar cotação
-        document.getElementById('limpar-cotacao').addEventListener('click', function() {
-            document.getElementById('cotacaoForm').reset();
-            document.getElementById('resultados').innerHTML = '';
-            document.getElementById('resumoCarga').style.display = 'none';
-            
-            // Manter apenas o primeiro pacote
-            const pacotes = document.querySelectorAll('.pacote-container');
-            for (let i = 1; i < pacotes.length; i++) {
-                pacotes[i].remove();
-            }
-            pacoteCount = 1;
-        });
+            <div class="d-grid gap-2 mt-3">
+              <button type="submit" class="btn btn-success btn-lg">
+                <i class="bi bi-play"></i> Cotar
+              </button>
+              <button type="button" id="limpar-cotacao" class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i> Limpar Cotação
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
 
-        // Máscaras para os campos
-        document.getElementById('cnpj_origem').addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length > 11) { // CNPJ
-                value = value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, '$1.$2.$3/$4-$5');
-            } else { // CPF
-                value = value.replace(/^(\d{3})(\d{3})(\d{3})(\d{2}).*/, '$1.$2.$3-$4');
-            }
-            e.target.value = value;
-        });
+      <div id="loading" class="loading">
+        <div class="spinner-border text-primary"></div>
+      </div>
 
-        document.getElementById('cnpj_destino').addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length > 11) { // CNPJ
-                value = value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, '$1.$2.$3/$4-$5');
-            } else { // CPF
-                value = value.replace(/^(\d{3})(\d{3})(\d{3})(\d{2}).*/, '$1.$2.$3-$4');
-            }
-            e.target.value = value;
-        });
+      <div id="resumoCarga" class="mt-4" style="display: none;">
+        <div class="card summary-card mb-3 shadow">
+          <div class="card-body">
+            <h5 class="card-title">Resumo da Carga</h5>
+            <div class="d-flex flex-wrap gap-2">
+              <span class="badge bg-primary info-badge" id="resumoQuantidade"></span>
+              <span class="badge bg-primary info-badge" id="resumoPeso"></span>
+              <span class="badge bg-success info-badge" id="resumoValor"></span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        document.getElementById('cep_origem').addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, '');
-            value = value.replace(/^(\d{5})(\d{3}).*/, '$1-$2');
-            e.target.value = value;
-        });
+      <div id="resultados" class="mt-3"></div>
+    </div>
+  </div>
 
-        document.getElementById('cep_destino').addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, '');
-            value = value.replace(/^(\d{5})(\d{3}).*/, '$1-$2');
-            e.target.value = value;
-        });
+  <!-- JS (Bootstrap + SweetAlert) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-        // Função para selecionar cotação
-        window.selecionarCotacao = function(index) {
-            console.log('Selecionando cotação:', opcoesCotas[index]);
-            const opcao = opcoesCotas[index];
-            
-            fetch('/selecionadas', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(opcao)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'sucesso') {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Cotação Selecionada',
-                        text: 'A cotação foi adicionada à lista de selecionadas!',
-                        confirmButtonColor: '#003366'
-                    });
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro',
-                        text: data.mensagem || 'Não foi possível selecionar a cotação.',
-                        confirmButtonColor: '#003366'
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao selecionar cotação:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: 'Ocorreu um erro ao selecionar a cotação.',
-                    confirmButtonColor: '#003366'
-                });
-            });
-        };
+  <script>
+    let pacoteCount = 1;
+    let opcoesCotas = []; // guarda as opções retornadas
 
-        // Envio do formulário
-        document.getElementById('cotacaoForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            // Mostrar loading
-            document.getElementById('loading').style.display = 'flex';
-            document.getElementById('resultados').innerHTML = '';
-            document.getElementById('resumoCarga').style.display = 'none';
-            
-            // Coletar dados do formulário
-            const formData = new FormData(document.getElementById('cotacaoForm'));
-            const data = {};
-            formData.forEach((value, key) => data[key] = value);
-            
-            // Validar campos obrigatórios
-            const camposObrigatorios = ['cnpj_origem', 'cep_origem', 'cnpj_destino', 'cep_destino'];
-            const camposFaltantes = camposObrigatorios.filter(campo => !data[campo]);
-            
-            if (camposFaltantes.length > 0) {
-                document.getElementById('loading').style.display = 'none';
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Campos obrigatórios',
-                    text: `Preencha os campos: ${camposFaltantes.join(', ')}`,
-                    confirmButtonColor: '#003366'
-                });
-                return;
-            }
-            
-            // Enviar requisição
-            fetch('/cotar', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams(data)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => Promise.reject(err));
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Dados recebidos da API:', data);
-                document.getElementById('loading').style.display = 'none';
-                
-                if (data.status === 'sucesso') {
-                    // Mostrar resumo da carga
-                    document.getElementById('resumoQuantidade').textContent = `Quantidade Total: ${data.dados_entrega.quantidade_total}`;
-                    document.getElementById('resumoPeso').textContent = `Peso Total: ${data.dados_entrega.peso_total}kg`;
-                    document.getElementById('resumoValor').textContent = `Valor Total: R$ ${parseFloat(data.dados_entrega.valor_total_carga).toFixed(2)}`;
-                    document.getElementById('resumoCarga').style.display = 'block';
-                    
-                    // Mostrar resultados
-                    const resultadosDiv = document.getElementById('resultados');
-                    opcoesCotas = data.opcoes || [];
-                    console.log('Opções de cotações:', opcoesCotas);
-                    
-                    if (opcoesCotas.length > 0) {
-                        resultadosDiv.innerHTML = `<div class='alert alert-success'><b>${opcoesCotas.length}</b> cotações encontradas.</div>`;
-                        opcoesCotas.sort((a, b) => parseFloat(a.total) - parseFloat(b.total)).forEach((opcao, index) => {
-                            const totalFormatado = isNaN(parseFloat(opcao.total)) ? 'N/A' : 'R$ ' + parseFloat(opcao.total).toFixed(2).replace('.', ',');
-                            const row = document.createElement('div');
-                            row.className = `card mb-3 border-start border-5 ${index === 0 ? 'border-success' : 'border-secondary'} result-row ${index === 0 ? 'best-option' : ''}`;
-                            console.log('Renderizando cotação:', opcao);
-                            
-                            row.innerHTML = `
-                                <div class="card-body">
-                                    <div class="row align-items-center">
-                                        <div class="col-md-4">
-                                            <div class="d-flex align-items-center">
-                                                ${opcao.imagem ? `<img src="${opcao.imagem}" class="transportadora-logo me-3" alt="Logo">` : ''}
-                                                <div>
-                                                    <strong>${opcao.transportadora || 'Transportadora'}</strong>
-                                                    <br><small>${opcao.integrador || ''}</small>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <small>Prazo</small>
-                                            <div>${opcao.prazo || 'N/A'} dias</div>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <small>Serviço</small>
-                                            <div>${opcao.servico || 'Padrão'}</div>
-                                        </div>
-                                        <div class="col-md-3 text-end">
-                                            <small>Valor</small>
-                                            <div class="valor-frete">${totalFormatado}</div>
-                                            ${index === 0 ? '<span class="badge bg-success">Melhor Opção</span>' : ''}
-                                            <button type="button" class="btn btn-primary btn-sm mt-2" onclick="selecionarCotacao(${index})">Selecionar</button>
-                                        </div>
-                                    </div>
-                                    ${opcao.observacao ? `<div class="mt-2"><small>Obs: ${opcao.observacao}</small></div>` : ''}
-                                </div>
-                            `;
-                            
-                            resultadosDiv.appendChild(row);
-                        });
-                    } else {
-                        resultadosDiv.innerHTML = '<div class="alert alert-warning">Nenhuma cotação disponível para os parâmetros informados</div>';
-                    }
-                } else {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Ops...',
-                        text: data.mensagem || 'Não foi possível obter cotações de frete.',
-                        confirmButtonColor: '#003366'
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao processar requisição:', error);
-                document.getElementById('loading').style.display = 'none';
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: error.mensagem || 'Ocorreu um erro ao processar sua solicitação',
-                    confirmButtonColor: '#003366'
-                });
-            });
-        });
-    </script>
+    // Adicionar novo pacote
+    document.getElementById('adicionar-pacote').addEventListener('click', function() {
+      const container = document.getElementById('pacotes-container');
+      const newPacote = document.createElement('div');
+      newPacote.className = 'pacote-container';
+      newPacote.id = `pacote-${pacoteCount}`;
+      newPacote.innerHTML = `
+        <button type="button" class="btn btn-sm btn-danger remover-pacote" onclick="removerPacote(${pacoteCount})">
+          <i class="bi bi-x"></i>
+        </button>
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="mb-3">
+              <label for="quantidade_${pacoteCount}" class="form-label">Quantidade</label>
+              <input type="number" class="form-control" name="quantidade_${pacoteCount}" id="quantidade_${pacoteCount}" value="1" min="1" required>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="mb-3">
+              <label for="peso_${pacoteCount}" class="form-label">Peso (kg)</label>
+              <input type="number" step="0.01" class="form-control" name="peso_${pacoteCount}" id="peso_${pacoteCount}" value="1" min="0.01" required>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="mb-3">
+              <label for="altura_${pacoteCount}" class="form-label">Altura (m)</label>
+              <input type="number" step="0.01" class="form-control" name="altura_${pacoteCount}" id="altura_${pacoteCount}" value="0.1" min="0.01" required>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="mb-3">
+              <label for="largura_${pacoteCount}" class="form-label">Largura (m)</label>
+              <input type="number" step="0.01" class="form-control" name="largura_${pacoteCount}" id="largura_${pacoteCount}" value="0.1" min="0.01" required>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="mb-3">
+              <label for="comprimento_${pacoteCount}" class="form-label">Profundidade (m)</label>
+              <input type="number" step="0.01" class="form-control" name="comprimento_${pacoteCount}" id="comprimento_${pacoteCount}" value="0.1" min="0.01" required>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="mb-3">
+              <label for="valor_unitario_${pacoteCount}" class="form-label">Valor Unitário (R$)</label>
+              <input type="number" step="0.01" class="form-control" name="valor_unitario_${pacoteCount}" id="valor_unitario_${pacoteCount}" value="100" min="0.01" required>
+            </div>
+          </div>
+        </div>
+      `;
+      container.appendChild(newPacote);
+      pacoteCount++;
+    });
+
+    // Remover pacote
+    window.removerPacote = function(id) {
+      if (document.querySelectorAll('.pacote-container').length > 1) {
+        document.getElementById(`pacote-${id}`).remove();
+      } else {
+        Swal.fire({ icon: 'warning', title: 'Atenção', text: 'É necessário ter pelo menos um pacote', confirmButtonColor: '#003366' });
+      }
+    };
+
+    // Limpar cotação
+    document.getElementById('limpar-cotacao').addEventListener('click', function() {
+      document.getElementById('cotacaoForm').reset();
+      document.getElementById('resultados').innerHTML = '';
+      document.getElementById('resumoCarga').style.display = 'none';
+      const pacotes = document.querySelectorAll('.pacote-container');
+      for (let i = 1; i < pacotes.length; i++) pacotes[i].remove();
+      pacoteCount = 1;
+    });
+
+    // Máscaras simples
+    document.getElementById('cnpj_origem').addEventListener('input', function(e) {
+      let v = e.target.value.replace(/\D/g, '');
+      if (v.length > 11) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, '$1.$2.$3/$4-$5');
+      else v = v.replace(/^(\d{3})(\d{3})(\d{3})(\d{2}).*/, '$1.$2.$3-$4');
+      e.target.value = v;
+    });
+    document.getElementById('cnpj_destino').addEventListener('input', function(e) {
+      let v = e.target.value.replace(/\D/g, '');
+      if (v.length > 11) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, '$1.$2.$3/$4-$5');
+      else v = v.replace(/^(\d{3})(\d{3})(\d{3})(\d{2}).*/, '$1.$2.$3-$4');
+      e.target.value = v;
+    });
+    document.getElementById('cep_origem').addEventListener('input', function(e) {
+      let v = e.target.value.replace(/\D/g, '');
+      v = v.replace(/^(\d{5})(\d{3}).*/, '$1-$2');
+      e.target.value = v;
+    });
+    document.getElementById('cep_destino').addEventListener('input', function(e) {
+      let v = e.target.value.replace(/\D/g, '');
+      v = v.replace(/^(\d{5})(\d{3}).*/, '$1-$2');
+      e.target.value = v;
+    });
+
+    // Selecionar cotação
+    window.selecionarCotacao = function(index) {
+      const opcao = opcoesCotas[index];
+      fetch('{{ url_for("selecionadas") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(opcao)
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'sucesso') {
+          Swal.fire({ icon: 'success', title: 'Cotação Selecionada', text: 'Adicionada às selecionadas!', confirmButtonColor: '#003366' });
+        } else {
+          Swal.fire({ icon: 'error', title: 'Erro', text: data.mensagem || 'Não foi possível selecionar.', confirmButtonColor: '#003366' });
+        }
+      })
+      .catch(() => Swal.fire({ icon: 'error', title: 'Erro', text: 'Falha ao selecionar a cotação.', confirmButtonColor: '#003366' }));
+    };
+
+    // Submeter cotação
+    document.getElementById('cotacaoForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      document.getElementById('loading').style.display = 'flex';
+      document.getElementById('resultados').innerHTML = '';
+      document.getElementById('resumoCarga').style.display = 'none';
+
+      const formData = new FormData(document.getElementById('cotacaoForm'));
+      const data = {};
+      formData.forEach((v, k) => data[k] = v);
+
+      const camposObrig = ['cnpj_origem','cep_origem','cnpj_destino','cep_destino'];
+      const falt = camposObrig.filter(c => !data[c]);
+      if (falt.length) {
+        document.getElementById('loading').style.display = 'none';
+        Swal.fire({ icon: 'error', title: 'Campos obrigatórios', text: `Preencha: ${falt.join(', ')}`, confirmButtonColor: '#003366' });
+        return;
+      }
+
+      fetch('{{ url_for("cotar") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(data)
+      })
+      .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+      .then(data => {
+        document.getElementById('loading').style.display = 'none';
+
+        if (data.status === 'sucesso') {
+          // resumo
+          document.getElementById('resumoQuantidade').textContent = `Quantidade Total: ${data.dados_entrega.quantidade_total}`;
+          document.getElementById('resumoPeso').textContent = `Peso Total: ${data.dados_entrega.peso_total}kg`;
+          document.getElementById('resumoValor').textContent = `Valor Total: R$ ${parseFloat(data.dados_entrega.valor_total_carga).toFixed(2)}`;
+          document.getElementById('resumoCarga').style.display = 'block';
+
+          // resultados
+          const resultadosDiv = document.getElementById('resultados');
+          opcoesCotas = data.opcoes || [];
+          if (opcoesCotas.length > 0) {
+            resultadosDiv.innerHTML = `<div class='alert alert-success'><b>${opcoesCotas.length}</b> cotações encontradas.</div>`;
+            opcoesCotas
+              .sort((a, b) => parseFloat(a.total || 0) - parseFloat(b.total || 0))
+              .forEach((opcao, index) => {
+                const totalFmt = isNaN(parseFloat(opcao.total)) ? 'N/A' : 'R$ ' + parseFloat(opcao.total).toFixed(2).replace('.', ',');
+                const row = document.createElement('div');
+                row.className = `card mb-3 border-start border-5 ${index === 0 ? 'border-success' : 'border-secondary'} result-row ${index === 0 ? 'best-option' : ''}`;
+
+                row.innerHTML = `
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-md-4">
+                        <div class="d-flex align-items-center">
+                          ${opcao.imagem ? `<img src="${opcao.imagem}" class="transportadora-logo me-3" alt="Logo">` : ''}
+                          <div>
+                            <strong>${opcao.transportadora || 'Transportadora'}</strong>
+                            <br><small>${opcao.integrador || ''}</small>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-3">
+                        <small>Prazo</small>
+                        <div>${opcao.prazo || 'N/A'}</div>
+                      </div>
+                      <div class="col-md-2">
+                        <small>Serviço</small>
+                        <div>${opcao.servico || 'Padrão'}</div>
+                      </div>
+                      <div class="col-md-3 text-end">
+                        <small>Valor</small>
+                        <div class="valor-frete">${totalFmt}</div>
+                        ${index === 0 ? '<span class="badge bg-success">Melhor Opção</span>' : ''}
+                        <button type="button" class="btn btn-primary btn-sm mt-2" onclick="selecionarCotacao(${index})">Selecionar</button>
+                      </div>
+                    </div>
+                    ${opcao.observacao ? `<div class="mt-2"><small>Obs: ${opcao.observacao}</small></div>` : ''}
+                  </div>
+                `;
+                resultadosDiv.appendChild(row);
+              });
+          } else {
+            resultadosDiv.innerHTML = '<div class="alert alert-warning">Nenhuma cotação disponível para os parâmetros informados.</div>';
+          }
+        } else {
+          Swal.fire({ icon: 'warning', title: 'Ops...', text: data.mensagem || 'Não foi possível obter cotações de frete.', confirmButtonColor: '#003366' });
+        }
+      })
+      .catch(error => {
+        document.getElementById('loading').style.display = 'none';
+        Swal.fire({ icon: 'error', title: 'Erro', text: error.mensagem || 'Ocorreu um erro ao processar sua solicitação', confirmButtonColor: '#003366' });
+      });
+    });
+  </script>
 </body>
 </html>
+
