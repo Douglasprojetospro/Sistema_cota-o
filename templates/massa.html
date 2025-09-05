@@ -1,329 +1,316 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Promov Logística - Cotação em Massa</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
-    <style>
-        body { background-color: #f4f6f9; overflow-x: hidden; }
-        .sidebar {
-            background-color: #003366;
-            color: white;
-            min-height: 100vh;
-            width: 220px;
-            position: fixed;
-        }
-        .sidebar-brand {
-            padding: 15px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-        .sidebar-brand img {
-            max-width: 150px;
-        }
-        .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 10px 15px;
-            margin: 2px 0;
-        }
-        .nav-link:hover, .nav-link.active {
-            color: white;
-            background-color: rgba(255,255,255,0.1);
-        }
-        .main-content {
-            margin-left: 220px;
-            padding: 30px;
-        }
-        .upload-area {
-            border: 2px dashed #003366;
-            border-radius: 10px;
-            padding: 30px;
-            text-align: center;
-            background-color: #f8f9fa;
-            transition: all 0.3s ease;
-        }
-        .upload-area:hover {
-            background-color: #e9ecef;
-            border-color: #001a33;
-        }
-        .progress-container {
-            margin-top: 20px;
-        }
-        .instructions {
-            background-color: #e9ecef;
-            border-radius: 5px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-        .btn-download {
-            margin-top: 10px;
-        }
-        @media (max-width: 768px) {
-            .sidebar { width: 100%; position: relative; }
-            .main-content { margin-left: 0; }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cotação em Massa</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <!-- Bootstrap & Icons (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" />
+  <style>
+    body { background-color: #f4f6f9; overflow-x: hidden; }
+    .sidebar { background-color: #003366; color: white; min-height: 100vh; width: 220px; position: fixed; }
+    .sidebar-brand { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; }
+    .sidebar-brand img { max-width: 150px; }
+    .nav-link { color: rgba(255,255,255,0.8); padding: 10px 15px; margin: 2px 0; }
+    .nav-link:hover, .nav-link.active { color: white; background-color: rgba(255,255,255,0.1); }
+    .main-content { margin-left: 220px; padding: 30px; }
+    .form-container { background-color: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .card { border-radius: 5px; }
+    .btn { border-radius: 5px; }
+    .btn-primary { background-color: #0d6efd; border-color: #0d6efd; }
+    .table { background: white; border-radius: 5px; overflow: hidden; }
+    th, td { vertical-align: middle; }
+    .grid { display: grid; gap: 8px; grid-template-columns: repeat(4, minmax(120px, 1fr)); }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #e9ecef; }
+    .results .card { margin-bottom: 15px; }
+    .results .card-header { background: #f8f9fa; }
+    .img { max-height: 20px; vertical-align: middle; margin-right: 6px; }
+    .muted { color: #6c757d; font-size: 12px; }
+    .upload-area {
+      border: 2px dashed #ccc;
+      padding: 30px;
+      text-align: center;
+      margin-bottom: 20px;
+      border-radius: 5px;
+    }
+    .progress-container {
+      margin-top: 20px;
+      display: none;
+    }
+    .status-info {
+      margin-top: 10px;
+      font-size: 0.9em;
+      color: #666;
+    }
+    #downloadSection {
+      display: none;
+    }
+    #cancelBtn {
+      display: none;
+      margin-left: 10px;
+    }
+    @media (max-width: 768px) {
+      .sidebar { width: 100%; position: relative; }
+      .main-content { margin-left: 0; padding: 15px; }
+      .grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .form-container { padding: 15px; }
+      .table-responsive { overflow-x: auto; }
+    }
+  </style>
 </head>
 <body>
-    <div class="d-flex">
-        <div class="sidebar">
-            <div class="sidebar-brand">
-                <img src="/static/img/logo-promov-branco.png" alt="Promov Logística Logo">
-            </div>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link" href="/"><i class="bi bi-house-door"></i> Início</a></li>
-                <li class="nav-item"><a class="nav-link" href="/cotacoes"><i class="bi bi-calculator"></i> Cotação</a></li>
-                <li class="nav-item"><a class="nav-link active" href="/massa"><i class="bi bi-collection"></i> Cotação em Massa</a></li>
-                <li class="nav-item"><a class="nav-link" href="/relatorios"><i class="bi bi-file-earmark-text"></i> Relatórios</a></li>
-                <li class="nav-item"><a class="nav-link" href="/selecionadas"><i class="bi bi-check-circle"></i> Selecionadas</a></li>
-                <li class="nav-item mt-auto"><a class="nav-link text-danger" href="/auth/logout"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
-            </ul>
-        </div>
-
-        <div class="main-content container-fluid">
-            <h2 class="mb-4"><i class="bi bi-collection"></i> Cotação em Massa</h2>
-
-            <div class="instructions card mb-4">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-info-circle"></i> Como usar</h5>
-                    <ol>
-                        <li>Baixe o modelo de planilha</li>
-                        <li>Preencha com os dados das cotações</li>
-                        <li>Faça o upload da planilha</li>
-                        <li>Aguarde o processamento</li>
-                        <li>Baixe o resultado</li>
-                    </ol>
-                    <button class="btn btn-primary btn-download" onclick="baixarModelo()">
-                        <i class="bi bi-download"></i> Baixar Modelo
-                    </button>
-                </div>
-            </div>
-
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <i class="bi bi-upload"></i> Upload de Planilha
-                </div>
-                <div class="card-body">
-                    <div class="upload-area" id="uploadArea">
-                        <i class="bi bi-cloud-upload display-4 text-primary mb-3"></i>
-                        <h5>Arraste e solte sua planilha aqui</h5>
-                        <p class="text-muted">ou</p>
-                        <input type="file" id="fileInput" accept=".xlsx" style="display: none;">
-                        <button class="btn btn-outline-primary" onclick="document.getElementById('fileInput').click()">
-                            Selecione o arquivo
-                        </button>
-                        <p class="text-muted mt-2">Apenas arquivos .xlsx são permitidos</p>
-                    </div>
-
-                    <div class="form-group mt-3">
-                        <label for="tipoRetorno" class="form-label">Tipo de Retorno:</label>
-                        <select class="form-select" id="tipoRetorno">
-                            <option value="mais_barata">Apenas opção mais barata</option>
-                            <option value="todas">Todas as opções</option>
-                        </select>
-                    </div>
-
-                    <div class="progress-container" id="progressContainer" style="display: none;">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Processando...</span>
-                            <span id="progressPercent">0%</span>
-                        </div>
-                        <div class="progress mb-3">
-                            <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%;" 
-                                 aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span id="progressText">0 de 0</span>
-                            <button class="btn btn-sm btn-danger" id="cancelButton" onclick="cancelarProcessamento()">
-                                <i class="bi bi-x-circle"></i> Cancelar
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="alert alert-info mt-3" id="infoAlert" style="display: none;">
-                        <i class="bi bi-info-circle"></i> <span id="infoMessage"></span>
-                    </div>
-
-                    <div class="alert alert-success mt-3" id="successAlert" style="display: none;">
-                        <i class="bi bi-check-circle"></i> Processamento concluído com sucesso!
-                        <button class="btn btn-sm btn-success ms-2" onclick="baixarResultado()">
-                            <i class="bi bi-download"></i> Baixar Resultado
-                        </button>
-                    </div>
-
-                    <div class="alert alert-danger mt-3" id="errorAlert" style="display: none;">
-                        <i class="bi bi-exclamation-triangle"></i> <span id="errorMessage"></span>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <div class="d-flex">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-brand">
+        <img src="{{ url_for('static', filename='img/logo-promov-branco.png') }}" alt="Promov Logística Logo">
+      </div>
+      <ul class="nav flex-column">
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('home') }}">
+            <i class="bi bi-house-door"></i> Início
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('home') }}">
+            <i class="bi bi-calculator"></i> Cotação
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="{{ url_for('massa.massa_home') }}">
+            <i class="bi bi-collection"></i> Cotação em Massa
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('relatorios') }}">
+            <i class="bi bi-file-earmark-text"></i> Relatórios
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('selecionadas') }}">
+            <i class="bi bi-check-circle"></i> Selecionadas
+          </a>
+        </li>
+        <li class="nav-item mt-auto">
+          <a class="nav-link text-danger" href="#"><i class="bi bi-box-arrow-right"></i> Sair</a>
+        </li>
+      </ul>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>
-        // Configurações de drag and drop
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const progressContainer = document.getElementById('progressContainer');
-        const progressBar = document.getElementById('progressBar');
-        const progressPercent = document.getElementById('progressPercent');
-        const progressText = document.getElementById('progressText');
-        const infoAlert = document.getElementById('infoAlert');
-        const infoMessage = document.getElementById('infoMessage');
-        const successAlert = document.getElementById('successAlert');
-        const errorAlert = document.getElementById('errorAlert');
-        const errorMessage = document.getElementById('errorMessage');
-        const cancelButton = document.getElementById('cancelButton');
+    <!-- CONTEÚDO -->
+    <div class="main-content container-fluid">
+      <h2 class="mb-4">Cotação em Massa</h2>
+      <p class="muted mb-3">Preencha várias linhas e envie tudo de uma vez. Cada linha precisa de origem, destino e pelo menos um pacote.</p>
 
-        // Eventos de drag and drop
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, preventDefaults, false);
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="card-title">Baixar Modelo</h5>
+          <p class="card-text">Baixe o modelo de planilha para preenchimento.</p>
+          <a href="{{ url_for('massa.baixar_modelo') }}" class="btn btn-primary"><i class="bi bi-download"></i> Baixar Modelo</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Enviar Planilha para Cotação</h5>
+          <p class="card-text">Envie sua planilha para obter cotações das transportadoras.</p>
+
+          <form id="uploadForm" enctype="multipart/form-data">
+            <div class="mb-3">
+              <label for="tipo_retorno" class="form-label">Tipo de Retorno:</label>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="tipo_retorno" name="tipo_retorno">
+                <label class="form-check-label" for="tipo_retorno">Retornar todas as transportadoras</label>
+              </div>
+            </div>
+
+            <div class="upload-area">
+              <input type="file" id="arquivo" name="arquivo" accept=".xlsx" class="form-control" required>
+            </div>
+            <div class="d-flex mt-3">
+              <button type="submit" class="btn btn-success" id="submitBtn"><i class="bi bi-upload"></i> Enviar e Processar</button>
+              <button type="button" class="btn btn-danger" id="cancelBtn"><i class="bi bi-x-circle"></i> Cancelar</button>
+            </div>
+          </form>
+
+          <div class="progress-container" id="progressContainer">
+            <div class="progress">
+              <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+            </div>
+            <div class="status-info">
+              <span id="progressStatus">0</span> de <span id="totalItems">0</span> itens processados
+              (<span id="percentual">0</span>%)
+            </div>
+          </div>
+
+          <div id="resultado" class="mt-3"></div>
+
+          <div id="downloadSection" class="mt-3">
+            <a id="downloadBtn" href="#" class="btn btn-primary"><i class="bi bi-download"></i> Baixar Resultado</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS (Bootstrap + SweetAlert) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script>
+    let intervaloProgresso;
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const formData = new FormData();
+      const fileInput = document.getElementById('arquivo');
+      const tipoRetorno = document.getElementById('tipo_retorno').checked ? 'todas' : 'mais_barata';
+      const progressBar = document.getElementById('progressBar');
+      const progressContainer = document.getElementById('progressContainer');
+      const progressStatus = document.getElementById('progressStatus');
+      const totalItems = document.getElementById('totalItems');
+      const percentualSpan = document.getElementById('percentual');
+      const resultadoDiv = document.getElementById('resultado');
+      const downloadSection = document.getElementById('downloadSection');
+      const downloadBtn = document.getElementById('downloadBtn');
+
+      formData.append('arquivo', fileInput.files[0]);
+      formData.append('tipo_retorno', tipoRetorno);
+
+      // Resetar interface
+      progressContainer.style.display = 'block';
+      progressBar.style.width = '0%';
+      progressStatus.textContent = '0';
+      totalItems.textContent = '0';
+      percentualSpan.textContent = '0';
+      resultadoDiv.innerHTML = '';
+      downloadSection.style.display = 'none';
+      submitBtn.disabled = true;
+      cancelBtn.style.display = 'inline-block';
+
+      // Enviar arquivo para processamento
+      fetch("{{ url_for('massa.upload') }}", {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.erro) {
+          throw new Error(data.erro);
+        }
+
+        // Iniciar verificação de progresso
+        verificarProgresso();
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        resultadoDiv.innerHTML = `
+          <div class="alert alert-danger mt-3">
+            ${error.message || 'Ocorreu um erro durante o processamento.'}
+          </div>
+        `;
+        progressContainer.style.display = 'none';
+        submitBtn.disabled = false;
+        cancelBtn.style.display = 'none';
+      });
+    });
+
+    cancelBtn.addEventListener('click', function() {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Cancelar?',
+        text: 'Deseja realmente cancelar o processamento?',
+        showCancelButton: true,
+        confirmButtonColor: '#003366',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sim, cancelar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          fetch("{{ url_for('massa.cancelar') }}", {
+            method: 'POST'
+          })
+          .then(response => response.json())
+          .then(data => {
+            resultadoDiv.innerHTML = `
+              <div class="alert alert-warning mt-3">
+                ${data.mensagem || 'Processamento cancelado pelo usuário.'}
+              </div>
+            `;
+            clearInterval(intervaloProgresso);
+            progressContainer.style.display = 'none';
+            submitBtn.disabled = false;
+            cancelBtn.style.display = 'none';
+          })
+          .catch(() => {
+            Swal.fire({ icon: 'error', title: 'Erro', text: 'Falha ao cancelar o processamento.', confirmButtonColor: '#003366' });
+          });
+        }
+      });
+    });
+
+    function verificarProgresso() {
+      clearInterval(intervaloProgresso);
+
+      intervaloProgresso = setInterval(() => {
+        fetch("{{ url_for('massa.obter_progresso') }}")
+        .then(response => response.json())
+        .then(data => {
+          if (data.processando) {
+            // Atualizar barra de progresso
+            const percentual = data.progresso || 0;
+            document.getElementById('progressBar').style.width = `${percentual}%`;
+            document.getElementById('progressStatus').textContent = data.atual;
+            document.getElementById('totalItems').textContent = data.total;
+            document.getElementById('percentual').textContent = percentual;
+          } else if (data.completo) {
+            // Processamento concluído
+            clearInterval(intervaloProgresso);
+            document.getElementById('progressBar').style.width = '100%';
+            document.getElementById('percentual').textContent = '100';
+            document.getElementById('resultado').innerHTML = `
+              <div class="alert alert-success mt-3">
+                Processamento concluído com sucesso!
+              </div>
+            `;
+
+            // Mostrar botão de download
+            downloadSection.style.display = 'block';
+            downloadBtn.href = "{{ url_for('massa.baixar_resultado') }}";
+            downloadBtn.textContent = `Baixar Resultado`;
+
+            progressContainer.style.display = 'none';
+            submitBtn.disabled = false;
+            cancelBtn.style.display = 'none';
+          } else if (data.erro) {
+            // Exibir erro
+            clearInterval(intervaloProgresso);
+            document.getElementById('resultado').innerHTML = `
+              <div class="alert alert-danger mt-3">
+                ${data.erro}
+              </div>
+            `;
+            progressContainer.style.display = 'none';
+            submitBtn.disabled = false;
+            cancelBtn.style.display = 'none';
+          } else {
+            clearInterval(intervaloProgresso);
+            progressContainer.style.display = 'none';
+          }
+        })
+        .catch(error => {
+          console.error('Erro ao verificar progresso:', error);
+          Swal.fire({ icon: 'error', title: 'Erro', text: 'Falha ao verificar progresso.', confirmButtonColor: '#003366' });
+          clearInterval(intervaloProgresso);
+          progressContainer.style.display = 'none';
+          submitBtn.disabled = false;
+          cancelBtn.style.display = 'none';
         });
-
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, highlight, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, unhighlight, false);
-        });
-
-        function highlight() {
-            uploadArea.style.borderColor = '#001a33';
-            uploadArea.style.backgroundColor = '#e3f2fd';
-        }
-
-        function unhighlight() {
-            uploadArea.style.borderColor = '#003366';
-            uploadArea.style.backgroundColor = '#f8f9fa';
-        }
-
-        uploadArea.addEventListener('drop', handleDrop, false);
-
-        function handleDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            handleFiles(files);
-        }
-
-        fileInput.addEventListener('change', function() {
-            handleFiles(this.files);
-        });
-
-        function handleFiles(files) {
-            if (files.length > 0) {
-                const file = files[0];
-                if (!file.name.endsWith('.xlsx')) {
-                    showError('Por favor, selecione um arquivo .xlsx');
-                    return;
-                }
-                uploadFile(file);
-            }
-        }
-
-        function uploadFile(file) {
-            const formData = new FormData();
-            formData.append('arquivo', file);
-            formData.append('tipo_retorno', document.getElementById('tipoRetorno').value);
-
-            // Resetar alerts
-            hideAlerts();
-            showInfo('Iniciando processamento...');
-
-            fetch('/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.erro) {
-                    showError(data.erro);
-                } else {
-                    showInfo('Processamento iniciado. Aguarde...');
-                    progressContainer.style.display = 'block';
-                    checkProgress();
-                }
-            })
-            .catch(error => {
-                showError('Erro ao fazer upload: ' + error.message);
-            });
-        }
-
-        function checkProgress() {
-            fetch('/progresso')
-            .then(response => response.json())
-            .then(data => {
-                if (data.erro) {
-                    showError(data.erro);
-                    progressContainer.style.display = 'none';
-                } else if (data.completo) {
-                    progressContainer.style.display = 'none';
-                    successAlert.style.display = 'block';
-                    hideInfo();
-                } else if (data.processando) {
-                    progressBar.style.width = data.progresso + '%';
-                    progressPercent.textContent = data.progresso + '%';
-                    progressText.textContent = data.atual + ' de ' + data.total;
-                    setTimeout(checkProgress, 1000);
-                }
-            })
-            .catch(error => {
-                showError('Erro ao verificar progresso: ' + error.message);
-            });
-        }
-
-        function cancelarProcessamento() {
-            fetch('/cancelar', {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(data => {
-                showInfo('Processamento cancelado.');
-                progressContainer.style.display = 'none';
-            })
-            .catch(error => {
-                showError('Erro ao cancelar: ' + error.message);
-            });
-        }
-
-        function baixarModelo() {
-            window.location.href = '/baixar_modelo';
-        }
-
-        function baixarResultado() {
-            window.location.href = '/baixar_resultado';
-        }
-
-        function showInfo(message) {
-            infoMessage.textContent = message;
-            infoAlert.style.display = 'block';
-            errorAlert.style.display = 'none';
-        }
-
-        function hideInfo() {
-            infoAlert.style.display = 'none';
-        }
-
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorAlert.style.display = 'block';
-            infoAlert.style.display = 'none';
-            successAlert.style.display = 'none';
-        }
-
-        function hideAlerts() {
-            infoAlert.style.display = 'none';
-            errorAlert.style.display = 'none';
-            successAlert.style.display = 'none';
-        }
-    </script>
+      }, 1000);
+    }
+  </script>
 </body>
 </html>
