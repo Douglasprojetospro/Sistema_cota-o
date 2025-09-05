@@ -256,7 +256,7 @@
       clearInterval(intervaloProgresso);
 
       intervaloProgresso = setInterval(() => {
-        fetch("{{ url_for('massa.obter_progresso') }}")
+        fetch("{{ url_for('massa.progresso') }}")
         .then(response => response.json())
         .then(data => {
           if (data.processando) {
