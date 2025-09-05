@@ -1,137 +1,372 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Promov Logística - Relatórios de Coleta</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
-    <style>
-        body { background-color: #f4f6f9; overflow-x: hidden; }
-        .sidebar {
-            background-color: #003366;
-            color: white;
-            min-height: 100vh;
-            width: 220px;
-            position: fixed;
-        }
-        .sidebar-brand {
-            padding: 15px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-        .sidebar-brand img {
-            max-width: 150px;
-        }
-        .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 10px 15px;
-            margin: 2px 0;
-        }
-        .nav-link:hover, .nav-link.active {
-            color: white;
-            background-color: rgba(255,255,255,0.1);
-        }
-        .main-content {
-            margin-left: 220px;
-            padding: 30px;
-        }
-        .card-solicitacao { 
-            border-left: 4px solid #003366; 
-            transition: all 0.3s ease;
-            margin-bottom: 15px;
-        }
-        .badge-status { font-size: 0.9rem; }
-        .table-responsive { max-height: 400px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Promov Logística - Relatórios de Coleta</title>
+
+  <!-- Bootstrap & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css"/>
+
+  <style>
+    :root {
+      --sidebar-bg:#003366;
+      --sidebar-fg:#fff;
+      --muted-fg:rgba(255,255,255,.8);
+    }
+
+    body { background-color: #f4f6f9; overflow-x: hidden; }
+    .sidebar {
+      background-color: var(--sidebar-bg);
+      color: var(--sidebar-fg);
+      min-height: 100vh;
+      width: 220px;
+      position: fixed;
+      inset-block: 0;
+      inset-inline-start: 0;
+    }
+    .sidebar-brand { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; }
+    .sidebar-brand img { max-width: 150px; }
+    .nav-link { color: var(--muted-fg); padding: 10px 15px; margin: 2px 0; display: flex; align-items: center; gap:.5rem; border-radius:.375rem; }
+    .nav-link:hover, .nav-link.active { color: #fff; background-color: rgba(255,255,255,0.1); }
+    /* desabilitado mas visível */
+    .nav-link.disabled, .nav-link[aria-disabled="true"] { color: rgba(255,255,255,0.6) !important; pointer-events: none; display:flex !important; opacity:.7; }
+
+    .main-content { margin-left: 220px; padding: 30px; }
+
+    /* status badges */
+    .status-badge { font-size: .8rem; }
+    .status-solicitacao { background-color: #6c757d; } /* cinza  */
+    .status-transito    { background-color: #0d6efd; } /* azul   */
+    .status-pendencia   { background-color: #ffc107; color:#000; } /* amarelo */
+    .status-entregue    { background-color: #198754; } /* verde  */
+
+    /* realce por status na linha */
+    tr.row-status-solicitacao { background: #f7f7f7; }
+    tr.row-status-transito    { background: #eef5ff; }
+    tr.row-status-pendencia   { background: #fff8e1; }
+    tr.row-status-entregue    { background: #f2fff2; }
+
+    /* tabela com cabeçalho fixo */
+    .table-responsive { max-height: 70vh; overflow: auto; }
+    .table thead th { position: sticky; top: 0; z-index: 2; background: #f8f9fa; }
+
+    /* esconder cidade/UF em telas menores */
+    @media (max-width: 992px) { .col-hide-lg { display: none; } }
+
+    @media (max-width: 768px) {
+      .sidebar { width: 100%; position: relative; }
+      .main-content { margin-left: 0; padding: 16px; }
+    }
+  </style>
 </head>
 <body>
-    <div class="d-flex">
-        <div class="sidebar">
-            <div class="sidebar-brand">
-                <img src="/static/img/logo-promov-branco.png" alt="Promov Logística Logo">
-            </div>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link" href="/"><i class="bi bi-house-door"></i> Início</a></li>
-                <li class="nav-item"><a class="nav-link" href="/cotacoes"><i class="bi bi-calculator"></i> Cotação</a></li>
-                <li class="nav-item"><a class="nav-link" href="/massa"><i class="bi bi-collection"></i> Cotação em Massa</a></li>
-                <li class="nav-item"><a class="nav-link active" href="/relatorios"><i class="bi bi-file-earmark-text"></i> Relatórios</a></li>
-                <li class="nav-item"><a class="nav-link" href="/selecionadas"><i class="bi bi-check-circle"></i> Selecionadas</a></li>
-                <li class="nav-item mt-auto"><a class="nav-link text-danger" href="/auth/logout"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
-            </ul>
-        </div>
-
-        <div class="main-content container-fluid">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="bi bi-file-earmark-text"></i> Relatórios de Solicitações de Coleta</h2>
-                <div>
-                    <span class="badge bg-primary fs-6">{{ solicitacoes|length }} solicitações</span>
-                </div>
-            </div>
-
-            {% if solicitacoes %}
-            <div class="row">
-                {% for solicitacao in solicitacoes %}
-                <div class="col-lg-6 mb-4">
-                    <div class="card card-solicitacao shadow-sm">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div>
-                                    <h5 class="card-title">{{ solicitacao.cotacao.transportadora }}</h5>
-                                    <p class="card-text mb-1">
-                                        <strong>Nota Fiscal:</strong> 
-                                        {{ solicitacao.nfe_info.numero }} - Série {{ solicitacao.nfe_info.serie }}
-                                    </p>
-                                    <p class="card-text mb-1">
-                                        <strong>Valor do Frete:</strong> R$ {{ "%.2f"|format(solicitacao.cotacao.total|float) }}
-                                    </p>
-                                    <p class="card-text mb-1">
-                                        <strong>Prazo:</strong> {{ solicitacao.cotacao.prazo }}
-                                    </p>
-                                </div>
-                                <span class="badge {% if solicitacao.status == 'pendente' %}bg-warning{% else %}bg-success{% endif %} badge-status">
-                                    {{ solicitacao.status|title }}
-                                </span>
-                            </div>
-
-                            {% if solicitacao.observacoes %}
-                            <div class="alert alert-info p-2 mb-3">
-                                <small><i class="bi bi-info-circle"></i> {{ solicitacao.observacoes }}</small>
-                            </div>
-                            {% endif %}
-
-                            <div class="d-flex justify-content-between align-items-center">
-                                <small class="text-muted">
-                                    <i class="bi bi-calendar"></i> 
-                                    {{ solicitacao.timestamp|format_date }}
-                                </small>
-                                <div class="btn-group">
-                                    <a href="/relatorios/{{ solicitacao.id }}/xml" target="_blank" class="btn btn-outline-primary btn-sm">
-                                        <i class="bi bi-eye"></i> Ver XML
-                                    </a>
-                                    <a href="/relatorios/{{ solicitacao.id }}/download" class="btn btn-outline-secondary btn-sm">
-                                        <i class="bi bi-download"></i> Baixar
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-inbox display-1 text-muted"></i>
-                <h3 class="text-muted mt-3">Nenhuma solicitação de coleta</h3>
-                <p class="text-muted">As solicitações de coleta aparecerão aqui.</p>
-                <a href="/selecionadas" class="btn btn-primary">
-                    <i class="bi bi-check-circle"></i> Ver Cotações Selecionadas
-                </a>
-            </div>
-            {% endif %}
-        </div>
+  <div class="d-flex">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-brand">
+        <img src="{{ url_for('static', filename='img/logo-promov-branco.png') }}" alt="Promov Logística Logo">
+      </div>
+      <ul class="nav flex-column">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('home') }}"><i class="bi bi-house-door"></i> Início</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('home') }}"><i class="bi bi-calculator"></i> Cotação</a></li>
+        <!-- 🔧 Corrigido: rota robusta para Cotação em Massa -->
+        <li class="nav-item"><a class="nav-link" href="{{ massa_url() }}"><i class="bi bi-collection"></i> Cotação em Massa</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{{ url_for('relatorios') }}"><i class="bi bi-file-earmark-text"></i> Relatórios</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('selecionadas') }}"><i class="bi bi-check-circle"></i> Selecionadas</a></li>
+        <li class="nav-item mt-auto"><a class="nav-link text-danger" href="#"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
+      </ul>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- CONTEÚDO -->
+    <div class="main-content container-fluid">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0"><i class="bi bi-file-earmark-text"></i> Relatórios de Solicitações de Coleta</h2>
+        <div><span class="badge bg-primary fs-6">{{ solicitacoes|length }} solicitações</span></div>
+      </div>
+
+      <!-- ====== CARDS DE RESUMO ====== -->
+      {% set ns = namespace(total_frete=0, total_nf=0, prazo_sum=0, prazo_count=0, pendencias=0, transitos=0, solicitacoes_ct=0, entregues=0) %}
+      {% for s in solicitacoes %}
+        {% set ns.total_frete = ns.total_frete + (s.cotacao.total or 0)|float %}
+        {% set ns.total_nf    = ns.total_nf    + (s.nfe_info.valor_nf or 0)|float %}
+        {% set p = s.cotacao.prazo|extract_number %}
+        {% if p %}{% set ns.prazo_sum = ns.prazo_sum + p %}{% set ns.prazo_count = ns.prazo_count + 1 %}{% endif %}
+        {% set st = (s.status or 'solicitacao')|lower %}
+        {% if st == 'pendente' %}{% set st = 'pendencia' %}{% endif %}
+        {% if st == 'pendencia' %}{% set ns.pendencias = ns.pendencias + 1 %}{% endif %}
+        {% if st == 'transito' %}{% set ns.transitos   = ns.transitos   + 1 %}{% endif %}
+        {% if st == 'solicitacao' %}{% set ns.solicitacoes_ct = ns.solicitacoes_ct + 1 %}{% endif %}
+        {% if st == 'entregue' %}{% set ns.entregues   = ns.entregues   + 1 %}{% endif %}
+      {% endfor %}
+      {% set prazo_medio = (ns.prazo_sum / ns.prazo_count) if ns.prazo_count else 0 %}
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-3">
+          <div class="card shadow-sm h-100"><div class="card-body">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-currency-dollar fs-1 text-success me-3"></i>
+              <div><div class="text-muted">Total Frete</div><div class="h4 mb-0">R$ {{ "%.2f"|format(ns.total_frete) }}</div></div>
+            </div>
+          </div></div>
+        </div>
+        <div class="col-md-3">
+          <div class="card shadow-sm h-100"><div class="card-body">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-receipt fs-1 text-primary me-3"></i>
+              <div><div class="text-muted">Total Notas</div><div class="h4 mb-0">R$ {{ "%.2f"|format(ns.total_nf) }}</div></div>
+            </div>
+          </div></div>
+        </div>
+        <div class="col-md-3">
+          <div class="card shadow-sm h-100"><div class="card-body">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-clock fs-1 text-info me-3"></i>
+              <div><div class="text-muted">Prazo Médio</div><div class="h4 mb-0">{{ prazo_medio|round(1) }} dias</div></div>
+            </div>
+          </div></div>
+        </div>
+        <div class="col-md-3">
+          <div class="card shadow-sm h-100"><div class="card-body">
+            <div class="d-flex justify-content-between">
+              <div><span class="badge bg-secondary">Solicitação</span> {{ ns.solicitacoes_ct }}</div>
+              <div><span class="badge bg-primary">Trânsito</span> {{ ns.transitos }}</div>
+              <div><span class="badge bg-warning text-dark">Pendência</span> {{ ns.pendencias }}</div>
+              <div><span class="badge bg-success">Entregue</span> {{ ns.entregues }}</div>
+            </div>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- ====== FILTROS ====== -->
+      <div class="card mb-3 shadow-sm">
+        <div class="card-body">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-6">
+              <label class="form-label">Buscar</label>
+              <input id="filtroTexto" type="text" class="form-control" placeholder="Filtra por NF, razão social, cidade, transportadora, etc.">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Status</label>
+              <select id="filtroStatus" class="form-select">
+                <option value="">Todos</option>
+                <option value="solicitacao">Solicitação de coleta</option>
+                <option value="transito">Trânsito</option>
+                <option value="pendencia">Pendência</option>
+                <option value="entregue">Entregue</option>
+              </select>
+            </div>
+            <div class="col-md-3 text-md-end">
+              <button id="btnLimpar" class="btn btn-outline-secondary me-2"><i class="bi bi-eraser"></i> Limpar filtros</button>
+              <button id="btnCSV" class="btn btn-success"><i class="bi bi-download"></i> Exportar CSV</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== TABELA ====== -->
+      {% if solicitacoes %}
+      <div class="table-responsive">
+        <table id="tblRelatorios" class="table table-sm table-hover align-middle bg-white">
+          <thead class="table-light">
+            <tr>
+              <th>NF</th>
+              <th>Origem (Razão Social)</th>
+              <th class="col-hide-lg">Origem (Cidade/UF)</th>
+              <th>Destino (Razão Social)</th>
+              <th class="col-hide-lg">Destino (Cidade/UF)</th>
+              <th>Transportadora</th>
+              <th>Valor Frete</th>
+              <th>Valor Nota</th>
+              <th>Prazo</th>
+              <th>Status</th>
+              <th class="text-end">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in solicitacoes %}
+              {% set nf = s.nfe_info or {} %}
+              {% set ori = nf.origem or {} %}
+              {% set des = nf.destino or {} %}
+              {% set status_val = (s.status or 'solicitacao')|lower %}
+              {% if status_val == 'pendente' %}{% set status_val = 'pendencia' %}{% endif %}
+
+              <tr data-id="{{ s.id }}" class="row-status-{{ status_val }}">
+                <!-- NF -->
+                <td>
+                  <div class="fw-semibold">Nº {{ nf.numero or '—' }} • Série {{ nf.serie or '—' }}</div>
+                  <small class="text-muted">{{ nf.data_emissao|format_date }}</small>
+                </td>
+
+                <!-- ORIGEM -->
+                <td>
+                  <div class="fw-semibold">{{ ori.nome or '—' }}</div>
+                  <small class="text-muted d-block">CNPJ/CPF {{ ori.cnpj or '—' }} • CEP {{ ori.cep or '—' }}</small>
+                </td>
+                <td class="col-hide-lg">
+                  <div class="fw-semibold">{{ (ori.cidade or '—') ~ '/' ~ (ori.uf or '—') }}</div>
+                </td>
+
+                <!-- DESTINO -->
+                <td>
+                  <div class="fw-semibold">{{ des.nome or '—' }}</div>
+                  <small class="text-muted d-block">CNPJ/CPF {{ des.cnpj or '—' }} • CEP {{ des.cep or '—' }}</small>
+                </td>
+                <td class="col-hide-lg">
+                  <div class="fw-semibold">{{ (des.cidade or '—') ~ '/' ~ (des.uf or '—') }}</div>
+                </td>
+
+                <!-- Transportadora/Serviço -->
+                <td>
+                  <div class="fw-semibold">{{ s.cotacao.transportadora or '—' }}</div>
+                  <small class="text-muted">{{ s.cotacao.servico or 'Padrão' }}</small>
+                </td>
+
+                <!-- Valores -->
+                <td>R$ {{ "%.2f"|format((s.cotacao.total or 0)|float) }}</td>
+                <td>R$ {{ "%.2f"|format((nf.valor_nf or 0)|float) }}</td>
+
+                <!-- Prazo -->
+                <td>{{ s.cotacao.prazo or '—' }}</td>
+
+                <!-- Status (badge + select) -->
+                <td style="min-width: 190px;">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge status-badge
+                      {% if status_val == 'solicitacao' %} status-solicitacao
+                      {% elif status_val == 'transito' %} status-transito
+                      {% elif status_val == 'pendencia' %} status-pendencia
+                      {% elif status_val == 'entregue' %} status-entregue
+                      {% endif %}">
+                      {% if status_val == 'solicitacao' %}Solicitação de coleta
+                      {% elif status_val == 'transito' %}Trânsito
+                      {% elif status_val == 'pendencia' %}Pendência
+                      {% elif status_val == 'entregue' %}Entregue
+                      {% else %}Solicitação de coleta{% endif %}
+                    </span>
+
+                    <select class="form-select form-select-sm" onchange="atualizarStatus('{{ s.id }}', this.value)">
+                      <option value="solicitacao" {{ 'selected' if status_val == 'solicitacao' else '' }}>Solicitação de coleta</option>
+                      <option value="transito"     {{ 'selected' if status_val == 'transito' else '' }}>Trânsito</option>
+                      <option value="pendencia"    {{ 'selected' if status_val == 'pendencia' else '' }}>Pendência</option>
+                      <option value="entregue"     {{ 'selected' if status_val == 'entregue' else '' }}>Entregue</option>
+                    </select>
+                  </div>
+                </td>
+
+                <!-- Ações -->
+                <td class="text-end">
+                  <div class="btn-group">
+                    <a href="{{ url_for('visualizar_xml', solicitacao_id=s.id) }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                      <i class="bi bi-eye"></i> Ver XML
+                    </a>
+                    <a href="{{ url_for('download_xml', solicitacao_id=s.id) }}" class="btn btn-outline-secondary btn-sm">
+                      <i class="bi bi-download"></i> Baixar
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div id="noRows" class="text-center text-muted py-3" style="display:none;">
+          Nenhuma linha corresponde ao filtro.
+        </div>
+      </div>
+      {% else %}
+        <div class="text-center py-5">
+          <i class="bi bi-inbox display-1 text-muted"></i>
+          <h3 class="text-muted mt-3">Nenhuma solicitação de coleta</h3>
+          <p class="text-muted">As solicitações de coleta aparecerão aqui.</p>
+          <a href="{{ url_for('selecionadas') }}" class="btn btn-primary">
+            <i class="bi bi-check-circle"></i> Ver Cotações Selecionadas
+          </a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function atualizarStatus(id, status) {
+      fetch('{{ url_for("atualizar_status", solicitacao_id="__ID__") }}'.replace('__ID__', id), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status !== 'sucesso') {
+          alert(data.mensagem || 'Falha ao atualizar status.');
+          return;
+        }
+        const row = document.querySelector('tr[data-id="' + id + '"]');
+        if (!row) return;
+        const badge = row.querySelector('.status-badge');
+        const novo = data.novo_status;
+
+        // atualiza classes da linha
+        row.classList.remove('row-status-solicitacao','row-status-transito','row-status-pendencia','row-status-entregue');
+        // atualiza badge
+        badge.classList.remove('status-solicitacao','status-transito','status-pendencia','status-entregue');
+
+        if (novo === 'solicitacao') { row.classList.add('row-status-solicitacao'); badge.classList.add('status-solicitacao'); badge.textContent = 'Solicitação de coleta'; }
+        else if (novo === 'transito') { row.classList.add('row-status-transito'); badge.classList.add('status-transito'); badge.textContent = 'Trânsito'; }
+        else if (novo === 'pendencia') { row.classList.add('row-status-pendencia'); badge.classList.add('status-pendencia'); badge.textContent = 'Pendência'; }
+        else if (novo === 'entregue')  { row.classList.add('row-status-entregue');  badge.classList.add('status-entregue');  badge.textContent = 'Entregue'; }
+      })
+      .catch(() => alert('Erro de rede ao atualizar status.'));
+    }
+
+    // Filtros
+    const filtroTexto  = document.getElementById('filtroTexto');
+    const filtroStatus = document.getElementById('filtroStatus');
+    const noRows = document.getElementById('noRows');
+
+    function aplicaFiltros() {
+      const txt = (filtroTexto.value || '').toLowerCase().trim();
+      const st  = (filtroStatus.value || '').toLowerCase().trim();
+      const rows = document.querySelectorAll('#tblRelatorios tbody tr');
+      let visiveis = 0;
+
+      rows.forEach(row => {
+        const rowText = row.innerText.toLowerCase();
+        const isTxtOk = !txt || rowText.includes(txt);
+        const rowSt = (row.className.match(/row-status-(\w+)/) || [,''])[1];
+        const isStOk = !st || rowSt === st;
+
+        const show = isTxtOk && isStOk;
+        row.style.display = show ? '' : 'none';
+        if (show) visiveis++;
+      });
+
+      noRows.style.display = visiveis ? 'none' : 'block';
+    }
+
+    filtroTexto.addEventListener('input', aplicaFiltros);
+    filtroStatus.addEventListener('change', aplicaFiltros);
+    document.getElementById('btnLimpar')?.addEventListener('click', () => {
+      filtroTexto.value = ''; filtroStatus.value = ''; aplicaFiltros();
+    });
+
+    // Exportar CSV (somente linhas visíveis)
+    document.getElementById('btnCSV')?.addEventListener('click', () => {
+      const table = document.getElementById('tblRelatorios');
+      const rows = Array.from(table.querySelectorAll('tbody tr')).filter(tr => tr.style.display !== 'none');
+
+      const header = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
+      const data = rows.map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.innerText.replace(/\s+/g,' ').trim()));
+
+      const csv = [header, ...data].map(r => r.map(v => `"${(v||'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'relatorios.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
 </body>
 </html>
