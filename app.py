@@ -13,17 +13,20 @@ from io import BytesIO
 # ---------------------------------------------------------------------
 # Logging (logo após imports, para capturar tudo)
 # ---------------------------------------------------------------------
-logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:%(name)s:%(message)s")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger(__name__)
 
 # Carregar variáveis de ambiente do arquivo .env
+# (Em produção no Render, use as variáveis do painel)
 load_dotenv()
 
 # ---------------------------------------------------------------------
 # Tentativa de importar o blueprint externo (opcional)
+#   ATENÇÃO: o arquivo massa_blueprint.py NÃO deve importar a si mesmo.
+#   (ex.: NÃO use "from massa_blueprint import massa_bp" DENTRO dele)
 # ---------------------------------------------------------------------
 try:
-    from massa_blueprint import massa_bp  # precisa definir 'massa_bp' lá
+    from massa_blueprint import massa_bp  # precisa definir 'massa_bp' lá (sem auto-import)
     logger.info("Blueprint 'massa_bp' importado com sucesso")
 except Exception as e:
     import traceback
@@ -186,6 +189,10 @@ def inject_url_helpers():
 # ---------------------------------------------------------------------
 # Rotas básicas
 # ---------------------------------------------------------------------
+@app.get("/healthz")
+def healthz():
+    return "ok", 200
+
 @app.get("/health")
 def health():
     return "OK - Flask respondeu"
@@ -510,7 +517,7 @@ def _seed():
             "destino": {"nome": "Cliente Destino", "cnpj": "11.111.111/0001-11", "cep": "01001-000", "cidade": "São Paulo", "uf": "SP"},
         },
         "observacoes": "seed",
-        "status": "pendente",
+        "status": "pendencia",
         "timestamp": datetime.now().isoformat()
     }
     solicitacoes_coleta.append(solic)
@@ -554,4 +561,5 @@ def _routes():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
+
 
