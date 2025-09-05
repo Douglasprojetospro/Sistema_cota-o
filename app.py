@@ -188,6 +188,7 @@ def inject_url_helpers():
 # ---------------------------------------------------------------------
 @app.get("/healthz")
 def healthz():
+    # endpoint ASCII para health check no Render
     return "ok", 200
 
 @app.get("/health")
@@ -558,6 +559,4 @@ def _routes():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
-
-
 
