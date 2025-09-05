@@ -13,3 +13,4 @@ urllib3==2.2.3
 pandas
 openpyxl
 gunicorn>=22.0
+python-dotenv>=1.0
